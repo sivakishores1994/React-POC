@@ -1,0 +1,25 @@
+import { getProductInfo } from './your-file-path';
+import * as utils from '../utils/common/change.utils'; // Example for mocking utilities
+
+jest.mock('axios');
+jest.mock('../utils/common/change.utils');
+
+describe('getProductInfo', () => {
+  it('should return correct product information', async () => {
+    const mockProducts = [{ id: 1, name: 'Product 1' }];
+    const mockProductInfoResponse = { id: 1, details: 'Details of Product 1' };
+
+    // Mock external utility or function if used
+    utils.someUtilityFunction.mockReturnValue('mockedValue');
+
+    // Call your function with test data
+    const result = getProductInfo(mockProducts, mockProductInfoResponse);
+
+    // Assert the expected output
+    expect(result).toEqual({
+      id: 1,
+      name: 'Product 1',
+      details: 'Details of Product 1',
+    });
+  });
+});
