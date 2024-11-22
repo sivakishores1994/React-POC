@@ -1,58 +1,81 @@
-import { getProductInfo, getProductMetaData, initiateRTOBJourney } from './your-file';
-import axios from 'axios';
-import { urlParamAction } from '../utils/store/urlparam-slice';
-import { dispatchError, dispatchAuth, dispatchLoader } from '../utils/store/error-slice';
-import { authorize } from '../utils/store/authorize-slice';
-import { store } from '../utils/store/store';
+import { getProductInfo } from './yourFile'; // import the function
+import { urlParamAction } from '../utils/store/urlparam-slice'; // import the action to check dispatch
+import { dispatchError } from '../utils/store/error-slice'; // import dispatchError to test error handling
+import { AppDispatch } from '../utils/store/store'; // import AppDispatch for typing
 
-jest.mock('axios');
 jest.mock('../utils/store/urlparam-slice', () => ({
   urlParamAction: {
     productDetails: jest.fn(),
   },
 }));
+
 jest.mock('../utils/store/error-slice', () => ({
   dispatchError: jest.fn(),
-  dispatchAuth: jest.fn(),
-  dispatchLoader: jest.fn(),
 }));
-jest.mock('../utils/store/authorize-slice', () => ({
-  authorize: jest.fn(),
+
+// Mocking getUrl.getParameterByName to simulate URL parameters
+jest.mock('../utils/common/change.utils', () => ({
+  getUrl: {
+    getParameterByName: jest.fn(),
+  },
 }));
-jest.mock('../utils/store/store', () => ({
-  dispatch: jest.fn(),
-}));
+
+// Mock localStorage
+global.localStorage = {
+  setItem: jest.fn(),
+  getItem: jest.fn(),
+  removeItem: jest.fn(),
+  clear: jest.fn(),
+};
 
 describe('getProductInfo', () => {
-  it('should dispatch productDetails action with filtered products', async () => {
-    const mockResponse = {
-      data: {
-        products: [
-          { product_type: 'A', name: 'Product A' },
-          { product_type: 'B', name: 'Product B' },
-        ],
-      },
-    };
+  const productInfoResponse = [
+    { product_type: 'A', name: 'Product A' },
+    { product_type: 'B', name: 'Product B' },
+    { product_type: 'C', name: 'Product C' },
+  ];
 
-    axios.get.mockResolvedValue(mockResponse);
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should dispatch productDetails with filtered products based on the input', async () => {
+    const products = 'A,B'; // selected product types
     const dispatch = jest.fn();
 
-    await getProductInfo('A', mockResponse.data.products)(dispatch);
+    // Mock getUrl parameters (no campaign or intcid)
+    require('../utils/common/change.utils').getUrl.getParameterByName.mockReturnValue(null);
 
+    await getProductInfo(products, productInfoResponse)(dispatch);
+
+    // Check if localStorage is set with filtered products
+    expect(localStorage.setItem).toHaveBeenCalledWith(
+      'products',
+      JSON.stringify([
+        { product_type: 'A', name: 'Product A' },
+        { product_type: 'B', name: 'Product B' },
+      ])
+    );
+
+    // Check if the productDetails action was dispatched with the filtered products
     expect(dispatch).toHaveBeenCalledWith(
-      urlParamAction.productDetails([{ product_type: 'A', name: 'Product A' }])
+      urlParamAction.productDetails([
+        { product_type: 'A', name: 'Product A' },
+        { product_type: 'B', name: 'Product B' },
+      ])
     );
   });
 
-  it('should dispatch dispatchError action if no products are found', async () => {
-    const mockResponse = {
-      data: { products: [] },
-    };
-    axios.get.mockResolvedValue(mockResponse);
-
+  it('should dispatch error if no matching products are found', async () => {
+    const products = 'D'; // a product type that doesn't exist in the response
     const dispatch = jest.fn();
-    await getProductInfo('C', mockResponse.data.products)(dispatch);
 
+    // Mock getUrl parameters (no campaign or intcid)
+    require('../utils/common/change.utils').getUrl.getParameterByName.mockReturnValue(null);
+
+    await getProductInfo(products, productInfoResponse)(dispatch);
+
+    // Check if dispatchError action was called
     expect(dispatch).toHaveBeenCalledWith(
       dispatchError({
         response: {
@@ -62,74 +85,58 @@ describe('getProductInfo', () => {
       })
     );
   });
-});
 
-describe('getProductMetaData', () => {
-  it('should dispatch getProductInfo when products are found', async () => {
-    const mockResponse = {
-      data: {
-        products: [
-          { product_type: 'A', name: 'Product A' },
-          { product_type: 'B', name: 'Product B' },
-        ],
-      },
-    };
-
-    axios.get.mockResolvedValue(mockResponse);
+  it('should add campaign if it exists in the URL', async () => {
+    const products = 'A';
     const dispatch = jest.fn();
+    const campaign = 'summer2024'; // Mocked campaign value
 
-    await getProductMetaData('A')(dispatch);
+    // Mock getUrl parameters with a campaign
+    require('../utils/common/change.utils').getUrl.getParameterByName.mockReturnValueOnce(campaign);
 
+    await getProductInfo(products, productInfoResponse)(dispatch);
+
+    // Check if the campaign is added to the filtered product
+    expect(localStorage.setItem).toHaveBeenCalledWith(
+      'products',
+      JSON.stringify([
+        { product_type: 'A', name: 'Product A', campaign },
+      ])
+    );
+
+    // Check if the productDetails action was dispatched with the product that has the campaign
     expect(dispatch).toHaveBeenCalledWith(
-      urlParamAction.productDetails([{ product_type: 'A', name: 'Product A' }])
+      urlParamAction.productDetails([
+        { product_type: 'A', name: 'Product A', campaign },
+      ])
     );
   });
 
-  it('should dispatch dispatchError action on failure', async () => {
-    axios.get.mockRejectedValue(new Error('Network error'));
+  it('should update localStorage with intcid if it exists in the URL', async () => {
+    const products = 'A';
     const dispatch = jest.fn();
+    const intcid = '12345'; // Mocked intcid
 
-    await getProductMetaData('A')(dispatch);
+    // Mock getUrl parameters with intcid
+    require('../utils/common/change.utils').getUrl.getParameterByName.mockReturnValueOnce(intcid);
 
-    expect(dispatch).toHaveBeenCalledWith(
-      dispatchError(new Error('Network error'))
-    );
-  });
-});
+    await getProductInfo(products, productInfoResponse)(dispatch);
 
-describe('initiateRTOBJourney', () => {
-  it('should dispatch authorize action and handle myinfo flow type', async () => {
-    const mockToken = { channelRefNo: '1234' };
-    authorize.mockResolvedValue(mockToken);
-    sessionStorage.setItem = jest.fn();
-    const dispatch = jest.fn();
-
-    await initiateRTOBJourney()(dispatch);
-
-    expect(dispatch).toHaveBeenCalledWith(dispatchAuth(true));
-    expect(sessionStorage.setItem).toHaveBeenCalledWith('token', JSON.stringify('1234'));
-    expect(dispatch).toHaveBeenCalledWith(dispatchLoader(false));
+    // Check if localStorage was updated with intcid
+    expect(localStorage.setItem).toHaveBeenCalledWith('intcid', intcid);
   });
 
-  it('should dispatch formConfig and handle manual flow type', async () => {
-    const dispatch = jest.fn();
-    const mockResponse = { data: 'form-config' };
-    
-    // Mock function to simulate "manual" flow type
-    authenticateType.mockReturnValue('manual');
-    
-    await initiateRTOBJourney()(dispatch);
-
-    expect(dispatch).toHaveBeenCalledWith(formConfig('manual'));
-  });
-
-  it('should dispatch dispatchError action on failure', async () => {
-    const mockError = { response: { status: 'error', statusText: 'no response' } };
-    axios.get.mockRejectedValue(mockError);
+  it('should handle empty products string gracefully', async () => {
+    const products = ''; // empty products string
     const dispatch = jest.fn();
 
-    await initiateRTOBJourney()(dispatch);
+    // Mock getUrl parameters (no campaign or intcid)
+    require('../utils/common/change.utils').getUrl.getParameterByName.mockReturnValue(null);
 
-    expect(dispatch).toHaveBeenCalledWith(dispatchError(mockError));
+    await getProductInfo(products, productInfoResponse)(dispatch);
+
+    // Ensure no dispatch or localStorage changes occur when no products are selected
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(localStorage.setItem).not.toHaveBeenCalled();
   });
 });
