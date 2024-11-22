@@ -1,25 +1,135 @@
-import { getProductInfo } from './your-file-path';
-import * as utils from '../utils/common/change.utils'; // Example for mocking utilities
+import { getProductInfo, getProductMetaData, initiateRTOBJourney } from './your-file';
+import axios from 'axios';
+import { urlParamAction } from '../utils/store/urlparam-slice';
+import { dispatchError, dispatchAuth, dispatchLoader } from '../utils/store/error-slice';
+import { authorize } from '../utils/store/authorize-slice';
+import { store } from '../utils/store/store';
 
 jest.mock('axios');
-jest.mock('../utils/common/change.utils');
+jest.mock('../utils/store/urlparam-slice', () => ({
+  urlParamAction: {
+    productDetails: jest.fn(),
+  },
+}));
+jest.mock('../utils/store/error-slice', () => ({
+  dispatchError: jest.fn(),
+  dispatchAuth: jest.fn(),
+  dispatchLoader: jest.fn(),
+}));
+jest.mock('../utils/store/authorize-slice', () => ({
+  authorize: jest.fn(),
+}));
+jest.mock('../utils/store/store', () => ({
+  dispatch: jest.fn(),
+}));
 
 describe('getProductInfo', () => {
-  it('should return correct product information', async () => {
-    const mockProducts = [{ id: 1, name: 'Product 1' }];
-    const mockProductInfoResponse = { id: 1, details: 'Details of Product 1' };
+  it('should dispatch productDetails action with filtered products', async () => {
+    const mockResponse = {
+      data: {
+        products: [
+          { product_type: 'A', name: 'Product A' },
+          { product_type: 'B', name: 'Product B' },
+        ],
+      },
+    };
 
-    // Mock external utility or function if used
-    utils.someUtilityFunction.mockReturnValue('mockedValue');
+    axios.get.mockResolvedValue(mockResponse);
+    const dispatch = jest.fn();
 
-    // Call your function with test data
-    const result = getProductInfo(mockProducts, mockProductInfoResponse);
+    await getProductInfo('A', mockResponse.data.products)(dispatch);
 
-    // Assert the expected output
-    expect(result).toEqual({
-      id: 1,
-      name: 'Product 1',
-      details: 'Details of Product 1',
-    });
+    expect(dispatch).toHaveBeenCalledWith(
+      urlParamAction.productDetails([{ product_type: 'A', name: 'Product A' }])
+    );
+  });
+
+  it('should dispatch dispatchError action if no products are found', async () => {
+    const mockResponse = {
+      data: { products: [] },
+    };
+    axios.get.mockResolvedValue(mockResponse);
+
+    const dispatch = jest.fn();
+    await getProductInfo('C', mockResponse.data.products)(dispatch);
+
+    expect(dispatch).toHaveBeenCalledWith(
+      dispatchError({
+        response: {
+          status: 'error',
+          statusText: 'no response',
+        },
+      })
+    );
+  });
+});
+
+describe('getProductMetaData', () => {
+  it('should dispatch getProductInfo when products are found', async () => {
+    const mockResponse = {
+      data: {
+        products: [
+          { product_type: 'A', name: 'Product A' },
+          { product_type: 'B', name: 'Product B' },
+        ],
+      },
+    };
+
+    axios.get.mockResolvedValue(mockResponse);
+    const dispatch = jest.fn();
+
+    await getProductMetaData('A')(dispatch);
+
+    expect(dispatch).toHaveBeenCalledWith(
+      urlParamAction.productDetails([{ product_type: 'A', name: 'Product A' }])
+    );
+  });
+
+  it('should dispatch dispatchError action on failure', async () => {
+    axios.get.mockRejectedValue(new Error('Network error'));
+    const dispatch = jest.fn();
+
+    await getProductMetaData('A')(dispatch);
+
+    expect(dispatch).toHaveBeenCalledWith(
+      dispatchError(new Error('Network error'))
+    );
+  });
+});
+
+describe('initiateRTOBJourney', () => {
+  it('should dispatch authorize action and handle myinfo flow type', async () => {
+    const mockToken = { channelRefNo: '1234' };
+    authorize.mockResolvedValue(mockToken);
+    sessionStorage.setItem = jest.fn();
+    const dispatch = jest.fn();
+
+    await initiateRTOBJourney()(dispatch);
+
+    expect(dispatch).toHaveBeenCalledWith(dispatchAuth(true));
+    expect(sessionStorage.setItem).toHaveBeenCalledWith('token', JSON.stringify('1234'));
+    expect(dispatch).toHaveBeenCalledWith(dispatchLoader(false));
+  });
+
+  it('should dispatch formConfig and handle manual flow type', async () => {
+    const dispatch = jest.fn();
+    const mockResponse = { data: 'form-config' };
+    
+    // Mock function to simulate "manual" flow type
+    authenticateType.mockReturnValue('manual');
+    
+    await initiateRTOBJourney()(dispatch);
+
+    expect(dispatch).toHaveBeenCalledWith(formConfig('manual'));
+  });
+
+  it('should dispatch dispatchError action on failure', async () => {
+    const mockError = { response: { status: 'error', statusText: 'no response' } };
+    axios.get.mockRejectedValue(mockError);
+    const dispatch = jest.fn();
+
+    await initiateRTOBJourney()(dispatch);
+
+    expect(dispatch).toHaveBeenCalledWith(dispatchError(mockError));
   });
 });
