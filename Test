@@ -1,53 +1,70 @@
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react';
-import { useDispatch } from 'react-redux';
-import MyComponent from './MyComponent';
-import { getFields } from './actions';
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
+import "./alias.scss";
+import { getFields } from "./alias.utils";
+import renderComponent from "../../../modules/dashboard/fields/renderer";
+import { constant } from './constant';
 
-// Mock useDispatch and getFields
-jest.mock('react-redux', () => ({
-  useDispatch: jest.fn(),
-}));
+export const Alias = (props: KeyWithAnyModel) => {
 
-jest.mock('./actions', () => ({
-  getFields: jest.fn(),
-}));
+  const stageSelector = useSelector(
+    (state: StoreModel) => state.stages.stages
+  );
 
-describe('MyComponent', () => {
-  let mockDispatch;
+  const journeyType = useSelector((state: StoreModel) => state.stages.journeyType);
 
-  beforeEach(() => {
-    // Mock the dispatch function
-    mockDispatch = jest.fn();
-    (useDispatch as jest.Mock).mockReturnValue(mockDispatch);
-  });
+  const aliasSelector = useSelector(
+    (state: StoreModel) => state.alias
+  );
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  test('should call dispatch with correct arguments and update state', () => {
-    const mockStageComponents = ['component1', 'component2'];
-    // Mock the return value of dispatch
-    mockDispatch.mockReturnValue(mockStageComponents);
-    // Mock getFields to verify its call
-    (getFields as jest.Mock).mockReturnValue('mockGetFieldsAction');
-
-    const { getByText } = render(<MyComponent />);
-    const button = getByText('Add Alias');
-
-    // Trigger the function by clicking the button
-    fireEvent.click(button);
-
-    // Verify dispatch was called with the action from getFields
-    expect(getFields).toHaveBeenCalledWith(
-      'stageSelector',
-      'aliasSelector',
-      'add'
+  const dispatch = useDispatch();
+  const [field, setField] = useState([]);
+  const addNewAliasName = () => {
+    const stageComponents = dispatch(
+        getFields(stageSelector, aliasSelector, "add")
     );
-    expect(mockDispatch).toHaveBeenCalledWith('mockGetFieldsAction');
+    setField(stageComponents);
+  };
 
-    // Verify that setField was called with the returned components
-    expect(mockDispatch).toHaveReturnedWith(mockStageComponents);
-  });
-});
+  useEffect(() => {
+    if (stageSelector) {
+      const stageComponents = dispatch(
+        getFields(stageSelector, aliasSelector, "get")
+      );
+      setField(stageComponents);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aliasSelector]);
+
+    return (
+        <>
+         {field &&
+          field.map((currentSection: KeyWithAnyModel, index: number) => {
+            return renderComponent(
+              currentSection,
+              index,
+              props.handleCallback,
+              props.handleFieldDispatch,
+              props.value
+            );
+          })}
+          { !journeyType && <div className="alias__buttton">
+          <div className="alias__plus">
+            <input
+              type={constant.type}
+              name={constant.name}
+              aria-label={constant.ariaLabel}
+              id={constant.id}
+              placeholder={constant.placeholder}
+              value={constant.value}
+              className ={(aliasSelector && aliasSelector.count < aliasSelector.maxCount) ? 'show-btn, button' : 'hide-btn'}
+              onClick={() => addNewAliasName()}
+            />
+            </div>
+          </div>}
+        </>
+    )
+}
+
+export default Alias;
