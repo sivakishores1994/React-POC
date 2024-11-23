@@ -1,28 +1,76 @@
-export const getProductMetaData = (product_type:string | null): any => {
-  const url = `${process.env.REACT_APP_PRODUCT_INFO_URL}`;
-  return async (dispatch: AppDispatch) => {
-    return axios
-      .get(url)
-      .then(async (response) => {
-        let productInfoResponse = response.data.products;
-        let products = product_type ? product_type : getUrl.getParameterByName("products");
+import { getProductMetaData } from './your-file-path';
+import { getProductInfo } from './path-to-getProductInfo';
+import { dispatchError } from './path-to-dispatchError';
+import axios from 'axios';
+import { getUrl } from '../utils/common/change.utils';
 
-        if (products) {
-          dispatch(getProductInfo(products, productInfoResponse));
-          return Promise.resolve();
-        } else {
-          const error = {
-            response: {
-              status: "error",
-              statusText: "no response",
-            },
-          };
-          dispatch(dispatchError(error));
-          return Promise.reject();
-        }
-      })
-      .catch((error: AxiosError) => {
-        dispatch(dispatchError(error));
-      });
+jest.mock('axios');
+jest.mock('./path-to-getProductInfo', () => ({
+  getProductInfo: jest.fn(),
+}));
+jest.mock('./path-to-dispatchError', () => ({
+  dispatchError: jest.fn(),
+}));
+jest.mock('../utils/common/change.utils', () => ({
+  getUrl: {
+    getParameterByName: jest.fn(),
+  },
+}));
+
+describe('getProductMetaData', () => {
+  const mockDispatch = jest.fn();
+  const mockProducts = 'type1,type2';
+  const mockResponse = {
+    data: {
+      products: [{ product_type: 'type1' }, { product_type: 'type2' }],
+    },
   };
-};
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should dispatch getProductInfo when products exist in response', async () => {
+    (axios.get as jest.Mock).mockResolvedValue(mockResponse);
+    (getUrl.getParameterByName as jest.Mock).mockReturnValue(mockProducts);
+
+    const thunk = getProductMetaData(null); // Passing null to simulate URL query parameter
+    await thunk(mockDispatch);
+
+    expect(axios.get).toHaveBeenCalledWith(`${process.env.REACT_APP_PRODUCT_INFO_URL}`);
+    expect(getProductInfo).toHaveBeenCalledWith(
+      mockProducts,
+      mockResponse.data.products
+    );
+    expect(mockDispatch).toHaveBeenCalledWith(expect.any(Function)); // Check if dispatch is called with getProductInfo
+  });
+
+  it('should handle missing products and dispatch dispatchError', async () => {
+    (axios.get as jest.Mock).mockResolvedValue(mockResponse);
+    (getUrl.getParameterByName as jest.Mock).mockReturnValue(null); // No products
+
+    const thunk = getProductMetaData(null);
+    await thunk(mockDispatch);
+
+    expect(axios.get).toHaveBeenCalledWith(`${process.env.REACT_APP_PRODUCT_INFO_URL}`);
+    expect(dispatchError).toHaveBeenCalledWith({
+      response: {
+        status: 'error',
+        statusText: 'no response',
+      },
+    });
+    expect(mockDispatch).toHaveBeenCalledWith(expect.any(Object)); // Check dispatch with error
+  });
+
+  it('should handle axios request errors and dispatch dispatchError', async () => {
+    const mockError = new Error('Network error');
+    (axios.get as jest.Mock).mockRejectedValue(mockError);
+
+    const thunk = getProductMetaData(mockProducts);
+    await thunk(mockDispatch);
+
+    expect(axios.get).toHaveBeenCalledWith(`${process.env.REACT_APP_PRODUCT_INFO_URL}`);
+    expect(dispatchError).toHaveBeenCalledWith(mockError);
+    expect(mockDispatch).toHaveBeenCalledWith(expect.any(Object)); // Check dispatch with error
+  });
+});
