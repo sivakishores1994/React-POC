@@ -1,70 +1,103 @@
-import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
-import "./alias.scss";
-import { getFields } from "./alias.utils";
-import renderComponent from "../../../modules/dashboard/fields/renderer";
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { useDispatch, useSelector } from 'react-redux';
+import Alias from './Alias';
+import { getFields } from './alias.utils';
+import renderComponent from '../../../modules/dashboard/fields/renderer';
 import { constant } from './constant';
 
-export const Alias = (props: KeyWithAnyModel) => {
+jest.mock('react-redux', () => ({
+  useDispatch: jest.fn(),
+  useSelector: jest.fn(),
+}));
 
-  const stageSelector = useSelector(
-    (state: StoreModel) => state.stages.stages
-  );
+jest.mock('./alias.utils', () => ({
+  getFields: jest.fn(),
+}));
 
-  const journeyType = useSelector((state: StoreModel) => state.stages.journeyType);
+jest.mock('../../../modules/dashboard/fields/renderer', () => jest.fn());
 
-  const aliasSelector = useSelector(
-    (state: StoreModel) => state.alias
-  );
+describe('Alias Component', () => {
+  const mockDispatch = jest.fn();
+  const mockGetFields = jest.fn();
+  const mockRenderComponent = jest.fn();
 
-  const dispatch = useDispatch();
-  const [field, setField] = useState([]);
-  const addNewAliasName = () => {
-    const stageComponents = dispatch(
-        getFields(stageSelector, aliasSelector, "add")
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useDispatch as jest.Mock).mockReturnValue(mockDispatch);
+    (useSelector as jest.Mock).mockImplementation((selectorFn) => {
+      if (selectorFn.name === 'stageSelector') {
+        return [{ id: 'stage1', name: 'Stage 1' }];
+      }
+      if (selectorFn.name === 'journeyType') {
+        return false;
+      }
+      if (selectorFn.name === 'aliasSelector') {
+        return { count: 1, maxCount: 5 };
+      }
+      return {};
+    });
+    (getFields as jest.Mock).mockImplementation(mockGetFields);
+    (renderComponent as jest.Mock).mockImplementation(mockRenderComponent);
+  });
+
+  it('should render without crashing', () => {
+    render(<Alias handleCallback={jest.fn()} handleFieldDispatch={jest.fn()} value="" />);
+    expect(screen.getByPlaceholderText(constant.placeholder)).toBeInTheDocument();
+  });
+
+  it('should call getFields on initial render with "get" action', () => {
+    render(<Alias handleCallback={jest.fn()} handleFieldDispatch={jest.fn()} value="" />);
+    expect(mockDispatch).toHaveBeenCalled();
+    expect(mockGetFields).toHaveBeenCalledWith(
+      [{ id: 'stage1', name: 'Stage 1' }],
+      { count: 1, maxCount: 5 },
+      'get'
     );
-    setField(stageComponents);
-  };
+  });
 
-  useEffect(() => {
-    if (stageSelector) {
-      const stageComponents = dispatch(
-        getFields(stageSelector, aliasSelector, "get")
+  it('should update fields on button click for "add" action', () => {
+    render(<Alias handleCallback={jest.fn()} handleFieldDispatch={jest.fn()} value="" />);
+    const button = screen.getByPlaceholderText(constant.placeholder);
+    fireEvent.click(button);
+    expect(mockDispatch).toHaveBeenCalled();
+    expect(mockGetFields).toHaveBeenCalledWith(
+      [{ id: 'stage1', name: 'Stage 1' }],
+      { count: 1, maxCount: 5 },
+      'add'
+    );
+  });
+
+  it('should render components dynamically based on fields', () => {
+    const mockFields = [
+      { id: 'field1', name: 'Field 1' },
+      { id: 'field2', name: 'Field 2' },
+    ];
+    (getFields as jest.Mock).mockReturnValue(mockFields);
+
+    render(<Alias handleCallback={jest.fn()} handleFieldDispatch={jest.fn()} value="" />);
+    expect(mockRenderComponent).toHaveBeenCalledTimes(mockFields.length);
+    mockFields.forEach((field, index) => {
+      expect(mockRenderComponent).toHaveBeenCalledWith(
+        field,
+        index,
+        expect.any(Function),
+        expect.any(Function),
+        ''
       );
-      setField(stageComponents);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aliasSelector]);
+    });
+  });
 
-    return (
-        <>
-         {field &&
-          field.map((currentSection: KeyWithAnyModel, index: number) => {
-            return renderComponent(
-              currentSection,
-              index,
-              props.handleCallback,
-              props.handleFieldDispatch,
-              props.value
-            );
-          })}
-          { !journeyType && <div className="alias__buttton">
-          <div className="alias__plus">
-            <input
-              type={constant.type}
-              name={constant.name}
-              aria-label={constant.ariaLabel}
-              id={constant.id}
-              placeholder={constant.placeholder}
-              value={constant.value}
-              className ={(aliasSelector && aliasSelector.count < aliasSelector.maxCount) ? 'show-btn, button' : 'hide-btn'}
-              onClick={() => addNewAliasName()}
-            />
-            </div>
-          </div>}
-        </>
-    )
-}
+  it('should hide button when maxCount is reached', () => {
+    (useSelector as jest.Mock).mockImplementation((selectorFn) => {
+      if (selectorFn.name === 'aliasSelector') {
+        return { count: 5, maxCount: 5 }; // maxCount reached
+      }
+      return {};
+    });
 
-export default Alias;
+    render(<Alias handleCallback={jest.fn()} handleFieldDispatch={jest.fn()} value="" />);
+    const button = screen.queryByPlaceholderText(constant.placeholder);
+    expect(button).not.toBeVisible();
+  });
+});
