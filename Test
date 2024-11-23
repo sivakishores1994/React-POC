@@ -1,39 +1,28 @@
-// productHelper.test.ts
-import { getProduct } from './productHelper';
-import { ProductInfoResponse } from './models';
+export const getProductMetaData = (product_type:string | null): any => {
+  const url = `${process.env.REACT_APP_PRODUCT_INFO_URL}`;
+  return async (dispatch: AppDispatch) => {
+    return axios
+      .get(url)
+      .then(async (response) => {
+        let productInfoResponse = response.data.products;
+        let products = product_type ? product_type : getUrl.getParameterByName("products");
 
-test('should return the product when conditions are met', () => {
-  const products = "Electronics";
-
-  const productInfoResponse: ProductInfoResponse = {
-    campaign: "Holiday2024",
-    name: "Laptop",
-    product_category: "Electronics",
-    product_category_name: "Electronics",
-    product_sequence_number: 1,
-    product_type: "Tech",
-    product_description: "A high-end laptop",
+        if (products) {
+          dispatch(getProductInfo(products, productInfoResponse));
+          return Promise.resolve();
+        } else {
+          const error = {
+            response: {
+              status: "error",
+              statusText: "no response",
+            },
+          };
+          dispatch(dispatchError(error));
+          return Promise.reject();
+        }
+      })
+      .catch((error: AxiosError) => {
+        dispatch(dispatchError(error));
+      });
   };
-
-  const result = getProduct(products, productInfoResponse);
-
-  expect(result).toBe("Electronics");
-});
-
-test('should return "Product not found" when conditions are not met', () => {
-  const products = "Electronics";
-
-  const productInfoResponse: ProductInfoResponse = {
-    campaign: "Holiday2024",
-    name: "Laptop",
-    product_category: "Electronics",
-    product_category_name: "HomeAppliances", // Does not match `products`
-    product_sequence_number: 1,
-    product_type: "Tech",
-    product_description: "A high-end laptop",
-  };
-
-  const result = getProduct(products, productInfoResponse);
-
-  expect(result).toBe("Product not found");
-});
+};
