@@ -1,30 +1,39 @@
-const localStorageMock: Storage = {
-  store: {} as Record<string, string>,
+// productHelper.test.ts
+import { getProduct } from './productHelper';
+import { ProductInfoResponse } from './models';
 
-  get length() {
-    return Object.keys(this.store).length; // Dynamically calculate the length
-  },
+test('should return the product when conditions are met', () => {
+  const products = "Electronics";
 
-  key(index: number): string | null {
-    const keys = Object.keys(this.store);
-    return keys[index] || null;
-  },
+  const productInfoResponse: ProductInfoResponse = {
+    campaign: "Holiday2024",
+    name: "Laptop",
+    product_category: "Electronics",
+    product_category_name: "Electronics",
+    product_sequence_number: 1,
+    product_type: "Tech",
+    product_description: "A high-end laptop",
+  };
 
-  getItem(key: string): string | null {
-    return this.store[key] || null;
-  },
+  const result = getProduct(products, productInfoResponse);
 
-  setItem(key: string, value: string): void {
-    this.store[key] = value.toString();
-  },
+  expect(result).toBe("Electronics");
+});
 
-  removeItem(key: string): void {
-    delete this.store[key];
-  },
+test('should return "Product not found" when conditions are not met', () => {
+  const products = "Electronics";
 
-  clear(): void {
-    this.store = {};
-  },
-};
+  const productInfoResponse: ProductInfoResponse = {
+    campaign: "Holiday2024",
+    name: "Laptop",
+    product_category: "Electronics",
+    product_category_name: "HomeAppliances", // Does not match `products`
+    product_sequence_number: 1,
+    product_type: "Tech",
+    product_description: "A high-end laptop",
+  };
 
-Object.defineProperty(global, 'localStorage', { value: localStorageMock });
+  const result = getProduct(products, productInfoResponse);
+
+  expect(result).toBe("Product not found");
+});
