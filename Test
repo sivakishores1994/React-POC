@@ -1,41 +1,73 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { useSelector, useDispatch } from 'react-redux';
-import Alias from './Alias'; // Path to your component
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
+import "./alias.scss";
+import { getFields } from "./alias.utils";
+import renderComponent from "../../../modules/dashboard/fields/renderer";
+import { constant } from './constant';
 
-jest.mock('react-redux', () => ({
-  useSelector: jest.fn(),
-  useDispatch: jest.fn(),
-}));
+export const Alias = (props: KeyWithAnyModel) => {
+debugger
+  const stageSelector = useSelector(
+    (state: StoreModel) => state.stages.stages
+  );
 
-describe('Alias Component', () => {
-  it('should mock stageSelector and other useSelector calls', () => {
-    // Mock useDispatch
-    const mockDispatch = jest.fn();
-    (useDispatch as jest.Mock).mockReturnValue(mockDispatch);
+  const journeyType = useSelector((state: StoreModel) => state.stages.journeyType);
 
-    // Mock useSelector for different selectors
-    (useSelector as jest.Mock).mockImplementation((selectorFn) => {
-      if (selectorFn.toString().includes('state.stages.stages')) {
-        return 'mockedStageSelector'; // Mocked stageSelector value
-      }
-      if (selectorFn.toString().includes('state.stages.journeyType')) {
-        return 'mockedJourneyType'; // Mocked journeyType value
-      }
-      if (selectorFn.toString().includes('state.alias')) {
-        return 'mockedAliasSelector'; // Mocked aliasSelector value
-      }
-      return null;
-    });
+  const aliasSelector = useSelector(
+    (state: StoreModel) => state.alias
+  );
 
-    // Render component
-    render(<Alias />);
+  const dispatch = useDispatch();
+  const [field, setField] = useState([]);
+  const addNewAliasName = () => {
+    const stageComponents = dispatch(
+        getFields(stageSelector, aliasSelector, "add")
+    );
+    setField(stageComponents);
+  };
 
-    // Optionally check if dispatch was called
-    expect(mockDispatch).not.toHaveBeenCalled();
+  useEffect(() => {
+    if (stageSelector) {
+      const stageComponents = dispatch(
+        getFields(stageSelector, aliasSelector, "get")
+      );
+      setField(stageComponents);
+    }
+    /* istanbul ignore next */
+    else{
+    }  
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aliasSelector]);
 
-    // Add further assertions based on the component's behavior
-    // Example: Check if some text or DOM element is rendered
-    expect(screen.getByText(/mockedStageSelector/i)).toBeInTheDocument();
-  });
-});
+    return (
+        <>
+         {field &&
+          field.map((currentSection: KeyWithAnyModel, index: number) => {
+            return renderComponent(
+              currentSection,
+              index,
+              props.handleCallback,
+              props.handleFieldDispatch,
+              props.value
+            );
+          })}
+          { !journeyType && <div className="alias__buttton">
+          <div className="alias__plus">
+            <input
+              type={constant.type}
+              name={constant.name}
+              aria-label={constant.ariaLabel}
+              id={constant.id}
+              placeholder={constant.placeholder}
+              value={constant.value}
+              className ={(aliasSelector && aliasSelector.count < aliasSelector.maxCount) ? 'show-btn, button' : 'hide-btn'}
+              onClick={() => addNewAliasName()}
+            />
+            </div>
+          </div>}
+        </>
+    )
+}
+
+export default Alias;
