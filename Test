@@ -1,44 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import { useSelector, useDispatch } from 'react-redux';
+import Alias from './Alias'; // Path to your component
 
-const DocumentComponent = (props) => {
-  const [documentList, setDocumentList] = useState({});
+jest.mock('react-redux', () => ({
+  useSelector: jest.fn(),
+  useDispatch: jest.fn(),
+}));
 
-  // Initialize the state with props values
-  useEffect(() => {
-    if (props.documentList) {
-      setDocumentList({ ...props.documentList });
-    }
-  }, [props.documentList]);
+describe('Alias Component', () => {
+  it('should mock stageSelector and other useSelector calls', () => {
+    // Mock useDispatch
+    const mockDispatch = jest.fn();
+    (useDispatch as jest.Mock).mockReturnValue(mockDispatch);
 
-  const updateUploadedDocuments = (newDocument) => {
-    const updatedDocumentList = { ...documentList };
-    if (updatedDocumentList.document_types && updatedDocumentList.document_types[0]) {
-      updatedDocumentList.document_types[0].uploaded_documents = [
-        ...(updatedDocumentList.document_types[0].uploaded_documents || []),
-        newDocument,
-      ];
-    }
+    // Mock useSelector for different selectors
+    (useSelector as jest.Mock).mockImplementation((selectorFn) => {
+      if (selectorFn.toString().includes('state.stages.stages')) {
+        return 'mockedStageSelector'; // Mocked stageSelector value
+      }
+      if (selectorFn.toString().includes('state.stages.journeyType')) {
+        return 'mockedJourneyType'; // Mocked journeyType value
+      }
+      if (selectorFn.toString().includes('state.alias')) {
+        return 'mockedAliasSelector'; // Mocked aliasSelector value
+      }
+      return null;
+    });
 
-    // Update the state
-    setDocumentList(updatedDocumentList);
-  };
+    // Render component
+    render(<Alias />);
 
-  return (
-    <div>
-      <button
-        onClick={() =>
-          updateUploadedDocuments({
-            document_type_code: props.documentList?.document_types?.[0]?.document_type_code || '',
-            document_status: 'UPLOAD',
-          })
-        }
-      >
-        Upload Document
-      </button>
+    // Optionally check if dispatch was called
+    expect(mockDispatch).not.toHaveBeenCalled();
 
-      <pre>{JSON.stringify(documentList, null, 2)}</pre>
-    </div>
-  );
-};
-
-export default DocumentComponent;
+    // Add further assertions based on the component's behavior
+    // Example: Check if some text or DOM element is rendered
+    expect(screen.getByText(/mockedStageSelector/i)).toBeInTheDocument();
+  });
+});
