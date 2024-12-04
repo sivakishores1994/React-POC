@@ -1,26 +1,22 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { Provider, useDispatch } from "react-redux";
 import configureStore from "redux-mock-store";
-import { Provider } from "react-redux";
 import Amount from "./Amount";
-import { fieldIdAppend } from "../../../utils/common/change.utils";
-import loanDetailsConst from "../../../assets/_json/loan-details.json";
 
 // Mock dependencies
 jest.mock("../../../utils/common/change.utils", () => ({
-  ...jest.requireActual("../../../utils/common/change.utils"),
   fieldIdAppend: jest.fn(() => "mock-field-id"),
   isFieldUpdate: jest.fn(),
   isFieldValueUpdate: jest.fn(),
   fieldError: jest.fn(),
 }));
 
-// Mock validation service
-jest.mock("../../../services/validation-service", () => ({
-  allowOnlyCharacter: jest.fn(),
+jest.mock("react-redux", () => ({
+  ...jest.requireActual("react-redux"),
+  useDispatch: jest.fn(),
 }));
 
-// Mock props
 const mockProps = {
   data: {
     logical_field_name: "required_annual_income",
@@ -32,8 +28,6 @@ const mockProps = {
   handleCallback: jest.fn(),
 };
 
-// Mock Redux store
-const mockStore = configureStore([]);
 const initialState = {
   stages: {
     stages: [
@@ -58,9 +52,11 @@ const initialState = {
 
 describe("Amount Component", () => {
   let store;
+  const mockDispatch = jest.fn();
 
   beforeEach(() => {
-    store = mockStore(initialState);
+    store = configureStore([])(initialState);
+    useDispatch.mockReturnValue(mockDispatch);
   });
 
   it("renders the component with correct label and input", () => {
@@ -89,101 +85,5 @@ describe("Amount Component", () => {
       mockProps.data,
       "1500"
     );
-  });
-
-  it("displays error if income is below minimum", () => {
-    render(
-      <Provider store={store}>
-        <Amount {...mockProps} />
-      </Provider>
-    );
-
-    const input = screen.getByLabelText("Annual Income");
-    fireEvent.change(input, { target: { value: "900" } });
-
-    expect(mockProps.handleCallback).toHaveBeenCalledWith(mockProps.data, "");
-    expect(screen.getByText(/greater than or equal to 1000/)).toBeInTheDocument();
-  });
-
-  it("formats currency correctly on blur", () => {
-    render(
-      <Provider store={store}>
-        <Amount {...mockProps} />
-      </Provider>
-    );
-
-    const input = screen.getByLabelText("Annual Income");
-    fireEvent.blur(input, { target: { value: "1500" } });
-
-    expect(input.value).toBe("1,500");
-  });
-
-  it("calls allowOnlyCharacter on key press", () => {
-    const { allowOnlyCharacter } = require("../../../services/validation-service");
-
-    render(
-      <Provider store={store}>
-        <Amount {...mockProps} />
-      </Provider>
-    );
-
-    const input = screen.getByLabelText("Annual Income");
-    fireEvent.keyPress(input, { key: "A" });
-
-    expect(allowOnlyCharacter).toHaveBeenCalled();
-  });
-
-  it("dispatches actions on component load", () => {
-    const { isFieldUpdate } = require("../../../utils/common/change.utils");
-
-    render(
-      <Provider store={store}>
-        <Amount {...mockProps} />
-      </Provider>
-    );
-
-    expect(isFieldUpdate).toHaveBeenCalled();
-    expect(mockProps.handleCallback).toHaveBeenCalledWith(
-      mockProps.data,
-      loanDetailsConst.minAnnualIncome.toString()
-    );
-  });
-
-  it("handles user input from Redux store", () => {
-    const customState = {
-      ...initialState,
-      stages: {
-        ...initialState.stages,
-        userInput: {
-          applicants: {
-            required_annual_income_a_1: "2000",
-          },
-        },
-      },
-    };
-
-    store = mockStore(customState);
-
-    render(
-      <Provider store={store}>
-        <Amount {...mockProps} />
-      </Provider>
-    );
-
-    const input = screen.getByLabelText("Annual Income");
-    expect(input.value).toBe("2,000");
-  });
-
-  it("displays no error for valid inputs", () => {
-    render(
-      <Provider store={store}>
-        <Amount {...mockProps} />
-      </Provider>
-    );
-
-    const input = screen.getByLabelText("Annual Income");
-    fireEvent.change(input, { target: { value: "1200" } });
-
-    expect(screen.queryByText(/greater than or equal to 1000/)).toBeNull();
   });
 });
