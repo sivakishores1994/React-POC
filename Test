@@ -1,204 +1,189 @@
-import React, { useEffect, useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import {
-  fieldIdAppend,
-  isFieldUpdate,
-  getUrl,
-  isFieldValueUpdate,
-  fieldError
-} from "../../../utils/common/change.utils";
-import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
-import "./amount.scss";
-import validateService from "../../../services/validation-service";
+import React from "react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import configureStore from "redux-mock-store";
+import { Provider } from "react-redux";
+import Amount from "./Amount";
+import { fieldIdAppend } from "../../../utils/common/change.utils";
 import loanDetailsConst from "../../../assets/_json/loan-details.json";
 
-const Amount = (props: KeyWithAnyModel) => {
-  const [errors, setErrors] = useState(false);
-  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
-  const dispatch = useDispatch();
-  const [defaultValue, setDefaultValue] = useState("");
-  const userInputSelector = useSelector(
-    (state: StoreModel) => state.stages.userInput
-  );
-  const fieldErrorSelector = useSelector(
-    (state: StoreModel) => state.fielderror.error
-  );
+// Mock dependencies
+jest.mock("../../../utils/common/change.utils", () => ({
+  ...jest.requireActual("../../../utils/common/change.utils"),
+  fieldIdAppend: jest.fn(() => "mock-field-id"),
+  isFieldUpdate: jest.fn(),
+  isFieldValueUpdate: jest.fn(),
+  fieldError: jest.fn(),
+}));
 
-  const changeHandler = (
-    fieldName: string,
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setDefaultValue(event.target.value);
-    if(props.data.logical_field_name === 'required_annual_income'){
-      if(parseInt(event.target.value) >= loanDetailsConst.minAnnualIncome){
-        props.handleCallback(props.data, event.target.value);
-        dispatch(isFieldUpdate(props, event.target.value, props.data.logical_field_name));
-        setErrors(!event.target.validity.valid);
-      } else {
-        props.handleCallback(props.data, "");
-        setErrors(true);
-      }
-    } else {
-      props.handleCallback(props.data, event.target.value);
-      setErrors(!event.target.validity.valid);
-    }
-    //setErrors(!event.target.validity.valid);
-  };
+// Mock validation service
+jest.mock("../../../services/validation-service", () => ({
+  allowOnlyCharacter: jest.fn(),
+}));
 
-  useEffect(() => {
-    if (
-      stageSelector &&
-      stageSelector[0] &&
-      stageSelector[0].stageInfo &&
-      stageSelector[0].stageInfo.applicants
-    ) {
-      let value = getStoreValue();
-
-      if(props.data.logical_field_name === "required_annual_income" && !value){
-        value = stageSelector[0].stageInfo.applicants["annual_income_a_1"];
-      }
-
-      if(value && parseFloat(value) < loanDetailsConst.minAnnualIncome){
-        value = loanDetailsConst.minAnnualIncome.toString();
-      }
-     
-      let formattedValue = formateCurrency(value);
-      setDefaultValue(formattedValue);
-      dispatch(isFieldUpdate(props, value, props.data.logical_field_name));
-      props.handleCallback(props.data, value);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const bindHandler = (fieldName: string, event: any) => {
-    if (event.target.validity.valid) {
-      let fieldValue = event.target.value;
-      if (props.data.logical_field_name === 'required_annual_income' && fieldValue && parseFloat(fieldValue) < loanDetailsConst.minAnnualIncome) {
-        fieldValue = loanDetailsConst.minAnnualIncome.toString();
-        setErrors(false);
-      }
-      const formatedValue = formateCurrency(fieldValue);
-      setDefaultValue(formatedValue);
-      dispatch(isFieldUpdate(props, fieldValue, fieldName));
-      dispatch(isFieldValueUpdate(props, stageSelector, fieldValue));
-      props.handleCallback(props.data, fieldValue);
-    }
-  };
-
-  const formateCurrency = (amount: string) => {
-    if (amount) {
-      amount = amount.replaceAll(',','');
-      let formatedAmount = parseInt(amount).toLocaleString("en-US", {
-        style: "currency",
-        currency: "USD"
-      });
-      formatedAmount = formatedAmount.replaceAll("$", "").replaceAll(".00", "");
-      return formatedAmount;
-    } else {
-      return amount;
-    }
-  };
-
-  const allowOnlyNumber = (event: any, fieldName: string) => {
-    validateService.allowOnlyCharacter(event, fieldName);
-  };
-
-  const onFocus = (
-    fieldName: string,
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    if(event.target.value){
-      setDefaultValue(event.target.value.replaceAll(',',''));
-    }
-  };
-  useEffect(() => {
-    if(props.data.logical_field_name === "required_annual_income"){
-      if(userInputSelector.applicants.required_annual_income_a_1 >= loanDetailsConst.minAnnualIncome){
-        props.handleCallback(props.data, userInputSelector.applicants.required_annual_income_a_1);
-      } else {
-        props.handleCallback(props.data, "");
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[userInputSelector.applicants.required_annual_income_a_1])
-
-  const getStoreValue = () => {
-    if (
-      stageSelector &&
-      stageSelector[0] &&
-      stageSelector[0].stageInfo &&
-      stageSelector[0].stageInfo.applicants
-    ) {
-      const userInputResponse =
-        userInputSelector.applicants[fieldIdAppend(props)];
-
-      const stageIndex = getUrl
-        .getUpdatedStage()
-        .updatedStageInputs.findIndex(
-          (ref: any) => ref && ref.stageId === stageSelector[0].stageId
-        );
-      let updatedVal = null;
-      if (stageIndex > -1) {
-        console.log(getUrl.getUpdatedStage().updatedStageInputs[stageIndex]);
-        console.log(fieldIdAppend(props))
-        updatedVal =
-          getUrl.getUpdatedStage().updatedStageInputs[stageIndex].applicants[
-            fieldIdAppend(props)
-          ];
-      }
-
-      let fieldValue = "";
-      if (updatedVal) {
-        fieldValue = updatedVal;
-      } else if (userInputResponse) {
-        fieldValue = userInputResponse;
-      } else if (
-        stageSelector[0].stageInfo.applicants[fieldIdAppend(props)] &&
-        updatedVal !== ""
-      ) {
-        fieldValue =
-          stageSelector[0].stageInfo.applicants[fieldIdAppend(props)];
-      }
-      return fieldValue;
-    }
-    return "";
-  }
-
-  useEffect(() => {
-    setErrors(fieldError(fieldErrorSelector, props));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fieldErrorSelector]);
-
-  return (
-    <>
-      <div className="text">
-        <label htmlFor={props.data.logical_field_name}>
-          {props.data.rwb_label_name}
-        </label>
-        <input
-          type={props.data.type}
-          name={props.data.logical_field_name}
-          aria-label={props.data.logical_field_name}
-          id={fieldIdAppend(props)}
-          placeholder={props.data.rwb_label_name}
-          value={defaultValue}
-          minLength={props.data.min_length}
-          maxLength={props.data.length}
-          onChange={changeHandler.bind(this, props.data.logical_field_name)}
-          onBlur={bindHandler.bind(this, props.data.logical_field_name)}
-          onKeyPress={(event) =>
-            allowOnlyNumber(event, props.data.logical_field_name)
-          }
-          onFocus={onFocus.bind(this, props.data.logical_field_name)}
-        />
-        {errors && (
-        <div className="error-msg">
-          Please enter {props.data.rwb_label_name} greater than or equal to 1000
-        </div>
-      )}
-      </div>
-    </>
-  );
+// Mock props
+const mockProps = {
+  data: {
+    logical_field_name: "required_annual_income",
+    rwb_label_name: "Annual Income",
+    type: "text",
+    min_length: 1,
+    length: 10,
+  },
+  handleCallback: jest.fn(),
 };
 
-export default Amount;
+// Mock Redux store
+const mockStore = configureStore([]);
+const initialState = {
+  stages: {
+    stages: [
+      {
+        stageInfo: {
+          applicants: {
+            annual_income_a_1: "1200",
+          },
+        },
+      },
+    ],
+    userInput: {
+      applicants: {
+        required_annual_income_a_1: "1200",
+      },
+    },
+  },
+  fielderror: {
+    error: [],
+  },
+};
+
+describe("Amount Component", () => {
+  let store;
+
+  beforeEach(() => {
+    store = mockStore(initialState);
+  });
+
+  it("renders the component with correct label and input", () => {
+    render(
+      <Provider store={store}>
+        <Amount {...mockProps} />
+      </Provider>
+    );
+
+    expect(screen.getByLabelText("Annual Income")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Annual Income")).toBeInTheDocument();
+  });
+
+  it("updates input value and triggers changeHandler", () => {
+    render(
+      <Provider store={store}>
+        <Amount {...mockProps} />
+      </Provider>
+    );
+
+    const input = screen.getByLabelText("Annual Income");
+    fireEvent.change(input, { target: { value: "1500" } });
+
+    expect(input.value).toBe("1500");
+    expect(mockProps.handleCallback).toHaveBeenCalledWith(
+      mockProps.data,
+      "1500"
+    );
+  });
+
+  it("displays error if income is below minimum", () => {
+    render(
+      <Provider store={store}>
+        <Amount {...mockProps} />
+      </Provider>
+    );
+
+    const input = screen.getByLabelText("Annual Income");
+    fireEvent.change(input, { target: { value: "900" } });
+
+    expect(mockProps.handleCallback).toHaveBeenCalledWith(mockProps.data, "");
+    expect(screen.getByText(/greater than or equal to 1000/)).toBeInTheDocument();
+  });
+
+  it("formats currency correctly on blur", () => {
+    render(
+      <Provider store={store}>
+        <Amount {...mockProps} />
+      </Provider>
+    );
+
+    const input = screen.getByLabelText("Annual Income");
+    fireEvent.blur(input, { target: { value: "1500" } });
+
+    expect(input.value).toBe("1,500");
+  });
+
+  it("calls allowOnlyCharacter on key press", () => {
+    const { allowOnlyCharacter } = require("../../../services/validation-service");
+
+    render(
+      <Provider store={store}>
+        <Amount {...mockProps} />
+      </Provider>
+    );
+
+    const input = screen.getByLabelText("Annual Income");
+    fireEvent.keyPress(input, { key: "A" });
+
+    expect(allowOnlyCharacter).toHaveBeenCalled();
+  });
+
+  it("dispatches actions on component load", () => {
+    const { isFieldUpdate } = require("../../../utils/common/change.utils");
+
+    render(
+      <Provider store={store}>
+        <Amount {...mockProps} />
+      </Provider>
+    );
+
+    expect(isFieldUpdate).toHaveBeenCalled();
+    expect(mockProps.handleCallback).toHaveBeenCalledWith(
+      mockProps.data,
+      loanDetailsConst.minAnnualIncome.toString()
+    );
+  });
+
+  it("handles user input from Redux store", () => {
+    const customState = {
+      ...initialState,
+      stages: {
+        ...initialState.stages,
+        userInput: {
+          applicants: {
+            required_annual_income_a_1: "2000",
+          },
+        },
+      },
+    };
+
+    store = mockStore(customState);
+
+    render(
+      <Provider store={store}>
+        <Amount {...mockProps} />
+      </Provider>
+    );
+
+    const input = screen.getByLabelText("Annual Income");
+    expect(input.value).toBe("2,000");
+  });
+
+  it("displays no error for valid inputs", () => {
+    render(
+      <Provider store={store}>
+        <Amount {...mockProps} />
+      </Provider>
+    );
+
+    const input = screen.getByLabelText("Annual Income");
+    fireEvent.change(input, { target: { value: "1200" } });
+
+    expect(screen.queryByText(/greater than or equal to 1000/)).toBeNull();
+  });
+});
