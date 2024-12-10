@@ -1,126 +1,229 @@
-applicant_documents:[
-    {
-        "applicant_sequence_number": 1,
-        "document_list": [],
-        "journey_type": "NTC",
-        "email_id_change": "N",
-        "mobile_no_change": "N",
-        "last_updated_credit_limit_date_flag": "",
-        "staff_category": "N",
-        "existing_casa_account": [
-            {
-                "account_number": "0127752366",
-                "currency": "SGD"
-            }
-        ]
+import { useEffect, useState, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import validateService from "../../../services/validation-service";
+import {
+  fieldError,
+  isFieldUpdate,
+  fieldIdAppend,
+} from "../../../utils/common/change.utils";
+import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
+import "./dates.scss";
+import errorMsg from "../../../assets/_json/error.json";
+import { lastAction } from "../../../utils/store/last-accessed-slice";
+
+export const Date = (props: KeyWithAnyModel) => {
+  const [date, setDate] = useState({ DD: "", MM: "", YYYY: "" });
+  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
+  const [error, setError] = useState("");
+  const [validate,setValidate]=useState(true);
+  // const [pattern,setPattern]=useState("");
+  const dispatch = useDispatch();
+  const fieldErrorSelector = useSelector(
+    (state: StoreModel) => state.fielderror.error
+  );
+  const monthRef = useRef<HTMLInputElement>(null);
+  const yearRef = useRef<HTMLInputElement>(null);
+  
+ 
+
+  const changeHandler = (
+    data: React.ChangeEvent<HTMLInputElement>,
+    type: string
+  ) => {
+    setError("");
+    const fieldName = props.data.logical_field_name;
+    if (type === "YYYY") {
+      date["YYYY"] = data.target.value;
+    } else if (type === "MM") {
+      date["MM"] = data.target.value;
+      if(date["MM"].length === 2){
+        yearRef.current?.focus();
+      }
+    } else if (type === "DD") {
+      date["DD"] = data.target.value;
+      if(date["DD"].length === 2){
+        monthRef.current?.focus();
+      }
     }
-]
-applicants:{
-    "middle_name_a_1": null,
-    "FIN_a_1": null,
-    "email_preferred_contact_a_1": null,
-    "sales_id_1": null,
-    "pass_exp_date_a_1": null,
-    "document_no_a_1": null,
-    "request_id_dd": null,
-    "email_classification_a_1": null,
-    "mobile_preferred_contact_a_1": null,
-    "last_name_a_1": null,
-    "first_name_a_1": "TDMRinaldo TDMDarrion TDMValadon",
-    "dedupe_reason": null,
-    "source_system_name": null,
-    "document_category_a_1": null,
-    "existing_relationship_id_a_1": null,
-    "date_of_birth_a_1": "2000-09-06",
-    "cuco_icm_relid": null,
-    "passport_no_a_1": null,
-    "service_type_dd": null,
-    "arm_code": null,
-    "full_name_a_1": "TDMRinaldo TDMDarrion TDMValadon",
-    "application_date": null,
-    "NRIC_a_1": "S4235835E",
-    "last_updated_credit_limit_date_flag_a_1": null,
-    "noa_valid_a_1": null,
-    "home_branch_1": null,
-    "mobile_classification_a_1": null,
-    "dsa_code_a_1": null,
-    "contact_preference_casa_a_1": null,
-    "contact_preference_a_1": null,
-    "mobile_contact_type_a_1": null,
-    "name_of_document_a_1": null,
-    "channel_reference": null,
-    "referral_id_1": null,
-    "email_contact_type_a_1": null,
-    "email_a_1": "TDMRinaldo.1000354531@sc.com",
-    "ebid_a_1": null,
-    "email_id_change_a_1": null,
-    "country_of_account_opening": null,
-    "supplementary_card_flag_a_1": null,
-    "segment_ntb": null,
-    "other_source": null,
-    "residency_status_a_1": "CT",
-    "journey_type_a_1": null,
-    "mode_of_operation": null,
-    "dedupe_category": null,
-    "mobile_number_a_1": "65-88495605",
-    "mobile_country_code_a_1": null,
-    "icdd_reference_no_availability_a_1": null,
-    "cpf_valid_a_1": null,
-    "mobile_no_change_a_1": null,
-    "client_sequence_no_a_1": "1",
-    "fff_journey": "manual",
-    "WebSessionID": "6FDB3425212DA65F048BFB1FB80DB255.DEV_RTOB_SG-APPLICATION_01",
-    "w8_ben_indicator_a_1": null,
-    "fatca_indicator_a_1": null,
-    "icm_profile_id": "7020000002303753",
-    "fresh_fund_amount_a_1": "0.00",
-    "product_categories": "CC",
-    "gift_option_text_p_1": "null",
-    "country_of_birth_a_1": "IN",
-    "gender_a_1": "F",
-    "marital_status_a_1": "S",
-    "education_level_a_1": "GRD",
-    "postal_code_a_1": "789009",
-    "block_a_1": "56",
-    "building_name_a_1": "",
-    "street_name_a_1": "fghjk",
-    "unit_no_a_1": "",
-    "country_a_1": "VE",
-    "nationality_a_1": "SGP",
-    "ownership_status_a_1": "GO",
-    "address_usage_indicator_a_1": "NEW",
-    "work_type_a_1": "S",
-    "name_of_employer_a_1": "3142",
-    "nature_of_employer_a_1": "NB13",
-    "job_title_a_1": "11",
-    "office_phone_number_a_1": ""
-}
-application:{
-    "application_reference": "SG20241209600110",
-    "request_id": "1e6f3d02-d555-49fc-a089-659ff23381db",
-    "channel_reference": "02091ba87b1ea22024",
-    "branch_code": "330",
-    "country_code": "SG",
-    "source_system_name": "3",
-    "acquisition_channel": "DNF",
-    "referral_id": "1889559",
-    "referral": "",
-    "sourcing_id": "1889559",
-    "application_date": "2024-12-09",
-    "priority_flag": "",
-    "total_applicants": 1,
-    "segment": "03",
-    "is_td_with_casa": false,
-    "response_type": "INFO",
-    "response_action": "CONTINUE",
-    "error": {
-        "application_error": [],
-        "applicant_error": [],
-        "product_error": []
-    },
-    "application_status": "Saved",
-    "tmxSessionId": "80866c6f-a323-43bc-b30b-a95b874254b6",
-    "trueClientIP": "136.226.245.116",
-    "applicant_no": 0,
-    "total_applicants_gb": 0
-}
+    const userValue = date["YYYY"] + "-" + date["MM"] + "-" + date["DD"];
+    props.handleCallback(props.data, userValue);
+    if (date["DD"] !== "" || date["MM"] !== "" || date["YYYY"] !== "") {
+      if (
+        date["YYYY"].length > 3 &&
+        date["DD"].length > 1 &&
+        date["MM"].length > 1
+      ) {
+        if (validateService.isValidDate(userValue)) {
+          const age = validateService.calculateAge(userValue);
+          const ageInValid = validateService.validateAge(
+            age,
+            stageSelector[0].stageInfo.products[0].product_type,
+            stageSelector[0].stageInfo.products[0].product_category
+          );
+          if (ageInValid) {
+            let ageInvalidMessage = validateService.getValidationMsg(
+              stageSelector[0].stageInfo.products[0].product_type,
+              stageSelector[0].stageInfo.products[0].product_category
+            );
+            setError(`${props.data.rwb_label_name} ${ageInvalidMessage}`);
+            setValidate(false);
+          } else {
+            dispatch(isFieldUpdate(props, userValue, fieldName));
+            setValidate(true);
+          }
+        } else {
+          setError(`${errorMsg.patterns} ${props.data.rwb_label_name}`);
+        }
+      } else {
+        setError(`${errorMsg.patterns} ${props.data.rwb_label_name}`);
+      }
+    } else if (
+      props.data.mandatory === "Yes" ||
+      props.data.mandatory === "Conditional"
+    ) {
+      setError(`${errorMsg.emity} ${props.data.rwb_label_name}`);
+    }
+  };
+
+  const bindHandler = (data: any, type: string) => {
+    if (
+      (type === "DD" || type === "MM") &&
+      data.target.value &&
+      parseInt(data.target.value) > 0 &&
+      data.target.value.length < 2
+    ) {
+      date[type] = `0${data.target.value}`;
+      data.target.value = date[type];
+      changeHandler(data, type);
+    }
+  };
+  // useEffect(()=>{
+  //   const newPattern= validate? "^(19|20)\d{2})$":"";
+  //   setPattern(newPattern);
+  //   console.log('validate',validate)
+  //   console.log('newPattern',newPattern);
+  // },[validate]);
+  
+  useEffect(() => {
+    if (
+      stageSelector &&
+      stageSelector[0] &&
+      stageSelector[0].stageInfo &&
+      stageSelector[0].stageInfo.applicants
+    ) {
+      const storeDate =
+        stageSelector[0].stageInfo.applicants[
+          props.data.logical_field_name + "_a_1"
+        ];
+      if (storeDate) {
+        let splitDate = storeDate.split("-");
+        setDate({ DD: splitDate[2], MM: splitDate[1], YYYY: splitDate[0] });
+      }
+    }
+  }, [stageSelector, props.data.logical_field_name]);
+
+ 
+
+  useEffect(() => {
+    if (fieldError(fieldErrorSelector, props)) {
+      setError(`${errorMsg.patterns} ${props.data.rwb_label_name}`);
+    } else {
+      setError("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldErrorSelector]);
+
+  const allowOnlyCharacter = (
+    event: React.KeyboardEvent<HTMLInputElement>,
+    fieldName: string
+  ) => {
+    validateService.allowOnlyCharacter(event, fieldName);
+  };
+  const focusHandler = (
+    fieldName: string,
+    event: React.FocusEvent<HTMLInputElement>
+  ) => {
+    dispatch(lastAction.getField(fieldName));
+  };
+  return (
+    <>
+    
+      <div className="date">
+        <label htmlFor={props.data.logical_field_name}>
+          {props.data.rwb_label_name}
+        </label>
+        <div className={`date__inputs ${props.data.editable ? 'date__inputs--disabled':''}`} id={fieldIdAppend(props)}>
+          <input
+            placeholder="DD"
+            minLength={2}
+            maxLength={2}
+            type="tel"
+            value={date.DD} 
+            // required={
+            //   validate ? true : false
+            // }
+            // pattern={pattern}
+
+            onChange={(event) => changeHandler(event, "DD")}
+            onKeyPress={(event) =>
+              allowOnlyCharacter(event, props.data.logical_field_name)
+            }
+            onBlur={(event) => bindHandler(event, "DD")}
+            disabled={props.data.editable}
+            onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+          /><span className="date__seperator"></span>
+          <input
+            ref={monthRef}
+            placeholder="MM"
+            minLength={2}
+            maxLength={2}
+            type="tel"
+            value={date.MM}
+            // required={
+            //   validate ? true : false
+            // }
+            // pattern={pattern}
+
+            onChange={(event) => changeHandler(event, "MM")}
+            onKeyPress={(event) =>
+              allowOnlyCharacter(event, props.data.logical_field_name)
+            }
+            onBlur={(event) => bindHandler(event, "MM")}
+            disabled={props.data.editable}
+            onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+          /><span className="date__seperator"></span>
+          <input
+            ref={yearRef}
+            placeholder="YYYY"
+            minLength={4}
+            maxLength={4}
+            type="tel"
+            value={date.YYYY}
+            // required={
+            //   validate ? true : false
+            // }
+            pattern={validate? "^[12][0-9]{3}$":""}
+            onChange={(event) => changeHandler(event, "YYYY")}
+            onKeyPress={(event) =>
+              allowOnlyCharacter(event, props.data.logical_field_name)
+            }
+            disabled={props.data.editable}
+            onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+          />
+        </div>
+      </div>
+      {error && <span className="error-msg">{error}</span>}
+    </>
+  );
+};
+
+export default Date;
+
+
+const validateForm = (e: FormEvent<HTMLFormElement> | null) => {
+    if (e && e.currentTarget.checkValidity()) {
+      setIsFormValid(true);
+    } else {
+      setIsFormValid(false);
+    }
+  };
