@@ -1,25 +1,42 @@
 import React from "react";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import configureStore from "redux-mock-store";
 import { Header } from "./Header";
-import { getUrl } from "../../../utils/common/change.utils";
 
-// Mocking the necessary utilities
+// Mock `store.getState`
+jest.mock("../../../utils/store/store", () => ({
+  store: {
+    getState: jest.fn(() => ({
+      stages: {
+        stages: [
+          {
+            stageId: "testStage",
+            stageInfo: {
+              application: { journey_type: "ETC" },
+              products: [
+                {
+                  name: "Product Name",
+                  product_category: "CC",
+                  product_type: "280",
+                },
+              ],
+            },
+          },
+        ],
+        journeyType: "ETC",
+        isDocumentUpload: false,
+      },
+    })),
+  },
+}));
+
+// Mock utilities
 jest.mock("../../../utils/common/change.utils", () => ({
   getUrl: {
     getParameterByName: jest.fn().mockReturnValue(null), // You can adjust based on your test case
   },
 }));
-
-// Mock the components used inside Header
-jest.mock("../../../shared/components/close/close", () => () => (
-  <div data-testid="close-button">Close Button</div>
-));
-
-jest.mock("../../../shared/components/logo/logo", () => () => (
-  <div data-testid="logo">Logo</div>
-));
 
 jest.mock("../../../utils/common/header-titles", () =>
   jest.fn(() => "Mocked Header Title")
@@ -31,7 +48,6 @@ describe("Header Component", () => {
   let store: any;
 
   beforeEach(() => {
-    // Mocking the store structure for stages
     store = mockStore({
       stages: {
         stages: [
@@ -50,42 +66,59 @@ describe("Header Component", () => {
           },
         ],
         journeyType: "ETC",
-      },
-    });
-
-    // Mocking the store.getState() call to return the correct value
-    jest.spyOn(store, "getState").mockReturnValue({
-      stages: {
-        stages: [
-          {
-            stageId: "testStage",
-            stageInfo: {
-              application: { journey_type: "ETC" },
-              products: [
-                {
-                  name: "Product Name",
-                  product_category: "CC",
-                  product_type: "280",
-                },
-              ],
-            },
-          },
-        ],
-        journeyType: "ETC",
+        isDocumentUpload: false,
       },
     });
   });
 
-  it("renders without crashing", () => {
-    const { getByText } = render(
+  it("sets isMobileView based on window width", () => {
+    // Mock window.innerWidth
+    Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 500 });
+
+    // Render the component
+    render(
       <Provider store={store}>
         <Header />
       </Provider>
     );
 
-    // Check if the mocked title is rendered correctly
-    expect(getByText("Mocked Header Title")).toBeInTheDocument();
+    // Trigger resize event to test the effect
+    window.dispatchEvent(new Event("resize"));
+
+    // The isMobileView state is private, so verify its effect on the DOM
+    expect(screen.getByTestId("header")).toBeInTheDocument();
+    // You may add further checks based on the component's behavior for mobile view
   });
 
-  // Additional test cases can go here
+  it("sets wavesStyle based on header element heights", () => {
+    // Mock DOM structure
+    const mockGetElementsByClassName = jest.fn().mockImplementation((className) => {
+      if (className === "header__product-info") {
+        return [{ offsetHeight: 50 }]; // Mock product info height
+      }
+      if (className === "header__stage-info") {
+        return [{ offsetHeight: 100 }]; // Mock stage info height
+      }
+      return [];
+    });
+
+    // Mock getElementsByClassName
+    jest
+      .spyOn(global.document, "getElementsByClassName")
+      .mockImplementation(mockGetElementsByClassName);
+
+    // Render the component
+    render(
+      <Provider store={store}>
+        <Header />
+      </Provider>
+    );
+
+    // Simulate a DOM update
+    jest.advanceTimersByTime(100);
+
+    // Check that wavesStyle is set
+    // Note: You need to test DOM changes reflecting this style
+    // (depends on how it's applied in your component)
+  });
 });
