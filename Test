@@ -1,229 +1,290 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import "./dashboard.scss";
+import Header from "./header/header";
+import Fields from "./fields/fields";
 import { useDispatch, useSelector } from "react-redux";
-import validateService from "../../../services/validation-service";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
-  fieldError,
-  isFieldUpdate,
-  fieldIdAppend,
-} from "../../../utils/common/change.utils";
-import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
-import "./dates.scss";
-import errorMsg from "../../../assets/_json/error.json";
-import { lastAction } from "../../../utils/store/last-accessed-slice";
-
-export const Date = (props: KeyWithAnyModel) => {
-  const [date, setDate] = useState({ DD: "", MM: "", YYYY: "" });
-  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
-  const [error, setError] = useState("");
-  const [validate,setValidate]=useState(true);
-  // const [pattern,setPattern]=useState("");
+  dispatchLoader,
+  getClientInfo,
+  lovRequests,
+  resumeRequest,
+  uploadRequest,
+  getBancaEligibleProducts
+} from "../../services/common-service";
+import { StoreModel } from "../../utils/model/common-model";
+import MyinfoSingpassLogin from "../../shared/components/myinfo-singpass-login-modal/myinfo-singpass-login";
+import PopupModel from "../../shared/components/popup-model/popup-model";
+import { urlParamAction } from "../../utils/store/urlparam-slice";
+import Model from "../../shared/components/model/model";
+import { loaderAction } from "../../utils/store/loader-slice";
+import { store } from "../../utils/store/store";
+import { getUrl } from "../../utils/common/change.utils";
+import { authAction } from "../../utils/store/auth-slice";
+import { stagesAction } from "../../utils/store/stages-slice";
+import { taxAction } from "../../utils/store/tax-slice";
+import { bancaListAction } from "../../utils/store/banca-slice";
+import OTPModel from "../../shared/components/otp-modal/otp";
+import { nextStage } from "./fields/stage.utils";
+import { referralcodeAction } from "../../utils/store/referral-code-slice";
+import { BANCAINFO} from "../../utils/common/constants";
+import { rateAction } from "../../utils/store/rate-slice";
+ 
+const Dashboard = () => {
   const dispatch = useDispatch();
-  const fieldErrorSelector = useSelector(
-    (state: StoreModel) => state.fielderror.error
+  const navigate = useNavigate();
+  const urlParams = useLocation();
+  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
+  const applicationJourney = useSelector(
+    (state: StoreModel) => state.stages.journeyType
   );
-  const monthRef = useRef<HTMLInputElement>(null);
-  const yearRef = useRef<HTMLInputElement>(null);
-  
+  const myInfoAuthSelector = useSelector(
+    (state: StoreModel) => state.urlParam.myInfo
+  );
+  const otpShowSelector = useSelector(
+    (state: StoreModel) => state.stages.otpOpen
+  );
+  const otpResumeSelector = useSelector(
+    (state: StoreModel) => state.stages.otpResume
+  );
+  const referralcodeSelector = useSelector((state: StoreModel) => state.referralcode);
+  const [urlInvalid, setUrlInvalid] = useState(false);
+  const [marginTop, setMarginTop] = useState(0);
+  const headerHeight = useRef<HTMLInputElement>(null);
+  const [fieldsComponent, setFieldsComponent] = useState(false);
+  const [pointer, setPointer] = useState(false);
+  const ctaLoader: any = getUrl.getLoader().cta;
+  const [isMobileView, setIsMobileView] = useState<number>(0);
+  const [uploadJourney, setFieldsUpload] = useState(false);
+  const [ntcIbanking, setNtcIbanking] = useState(false);
  
-
-  const changeHandler = (
-    data: React.ChangeEvent<HTMLInputElement>,
-    type: string
-  ) => {
-    setError("");
-    const fieldName = props.data.logical_field_name;
-    if (type === "YYYY") {
-      date["YYYY"] = data.target.value;
-    } else if (type === "MM") {
-      date["MM"] = data.target.value;
-      if(date["MM"].length === 2){
-        yearRef.current?.focus();
-      }
-    } else if (type === "DD") {
-      date["DD"] = data.target.value;
-      if(date["DD"].length === 2){
-        monthRef.current?.focus();
-      }
-    }
-    const userValue = date["YYYY"] + "-" + date["MM"] + "-" + date["DD"];
-    props.handleCallback(props.data, userValue);
-    if (date["DD"] !== "" || date["MM"] !== "" || date["YYYY"] !== "") {
-      if (
-        date["YYYY"].length > 3 &&
-        date["DD"].length > 1 &&
-        date["MM"].length > 1
-      ) {
-        if (validateService.isValidDate(userValue)) {
-          const age = validateService.calculateAge(userValue);
-          const ageInValid = validateService.validateAge(
-            age,
-            stageSelector[0].stageInfo.products[0].product_type,
-            stageSelector[0].stageInfo.products[0].product_category
-          );
-          if (ageInValid) {
-            let ageInvalidMessage = validateService.getValidationMsg(
-              stageSelector[0].stageInfo.products[0].product_type,
-              stageSelector[0].stageInfo.products[0].product_category
-            );
-            setError(`${props.data.rwb_label_name} ${ageInvalidMessage}`);
-            setValidate(false);
-          } else {
-            dispatch(isFieldUpdate(props, userValue, fieldName));
-            setValidate(true);
-          }
-        } else {
-          setError(`${errorMsg.patterns} ${props.data.rwb_label_name}`);
-        }
-      } else {
-        setError(`${errorMsg.patterns} ${props.data.rwb_label_name}`);
-      }
-    } else if (
-      props.data.mandatory === "Yes" ||
-      props.data.mandatory === "Conditional"
-    ) {
-      setError(`${errorMsg.emity} ${props.data.rwb_label_name}`);
-    }
-  };
-
-  const bindHandler = (data: any, type: string) => {
-    if (
-      (type === "DD" || type === "MM") &&
-      data.target.value &&
-      parseInt(data.target.value) > 0 &&
-      data.target.value.length < 2
-    ) {
-      date[type] = `0${data.target.value}`;
-      data.target.value = date[type];
-      changeHandler(data, type);
-    }
-  };
-  // useEffect(()=>{
-  //   const newPattern= validate? "^(19|20)\d{2})$":"";
-  //   setPattern(newPattern);
-  //   console.log('validate',validate)
-  //   console.log('newPattern',newPattern);
-  // },[validate]);
-  
   useEffect(() => {
-    if (
-      stageSelector &&
-      stageSelector[0] &&
-      stageSelector[0].stageInfo &&
-      stageSelector[0].stageInfo.applicants
-    ) {
-      const storeDate =
-        stageSelector[0].stageInfo.applicants[
-          props.data.logical_field_name + "_a_1"
-        ];
-      if (storeDate) {
-        let splitDate = storeDate.split("-");
-        setDate({ DD: splitDate[2], MM: splitDate[1], YYYY: splitDate[0] });
-      }
+    if (ctaLoader) {
+      setPointer(ctaLoader.cta ? true : false);
     }
-  }, [stageSelector, props.data.logical_field_name]);
-
+  }, [ctaLoader]);
  
-
+  useLayoutEffect(() => {
+    let clearSetTimeout: ReturnType<typeof setTimeout>;
+    function updateSize() {
+      setIsMobileView(window.innerWidth < 768 ? 110 : 167);
+      if (headerHeight.current) {
+        clearSetTimeout = setTimeout(() => {
+          setMarginTop(headerHeight && headerHeight.current!["offsetHeight"]);
+        }, 100);
+      }
+    }
+    window.addEventListener("resize", updateSize);
+    updateSize();
+    return () => {
+      window.removeEventListener("resize", updateSize);
+      clearTimeout(clearSetTimeout);
+    };
+  }, [stageSelector]);
+ 
   useEffect(() => {
-    if (fieldError(fieldErrorSelector, props)) {
-      setError(`${errorMsg.patterns} ${props.data.rwb_label_name}`);
-    } else {
-      setError("");
+    if (otpResumeSelector) {
+      setFieldsComponent(true);
+      //dispatch(stagesAction.setOtpResume(false));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fieldErrorSelector]);
-
-  const allowOnlyCharacter = (
-    event: React.KeyboardEvent<HTMLInputElement>,
-    fieldName: string
-  ) => {
-    validateService.allowOnlyCharacter(event, fieldName);
-  };
-  const focusHandler = (
-    fieldName: string,
-    event: React.FocusEvent<HTMLInputElement>
-  ) => {
-    dispatch(lastAction.getField(fieldName));
-  };
+  }, [otpResumeSelector]);
+  
+  useEffect(() => {
+    dispatch(dispatchLoader(true));
+    dispatch(urlParamAction.getUrlParameter(urlParams));
+    if (!store.getState().urlParam.validUrl) {
+      dispatch(
+        loaderAction.getState({
+          isFetching: false,
+        })
+      );
+      setUrlInvalid(true);
+    } else if (getUrl.getParameterByName("auth") === "resume") {
+      dispatch(urlParamAction.isResume(true));
+      /* var mobilenumber = sessionStorage.getItem("mobileNumber");
+      dispatch(getClientInfo()).then(async (response: any) => {
+        if (response) {
+          setFieldsComponent(true);
+          navigate("/otp");
+        }
+      });*/
+      dispatch(
+        authAction.getSession({
+          sessionuid: sessionStorage.getItem("session_id"),
+        })
+      );
+      const refNo = sessionStorage.getItem("ref");
+    dispatch(urlParamAction.getAuthorize({ applicationRefNo: refNo }));
+    sessionStorage.removeItem("session_id");
+    sessionStorage.removeItem("ref");
+    dispatch(resumeRequest(refNo)).then(async (response: any) => {
+      if (response) {
+        if (response.application && response.application.journey_type) {
+          dispatch(
+            stagesAction.setJourneyType(response.application.journey_type)
+          );
+        }
+        if(response.application.journey_type === 'NTC' &&  (response.products[0].product_category === 'CC' || response.products[0].product_type === '280')){
+        dispatch(getBancaEligibleProducts(response));
+        dispatch(urlParamAction.getAuthorize({applicationRefNo:response.application.application_reference}));            
+        if(response.products[0].product_category === 'CC'){
+        let bancaDetails : any = {};
+        const bancaVal = response.applicants;
+        Object.keys(bancaVal).forEach((key:any) => {
+          if(BANCAINFO.DEFAULT_BANCA_VALUE.includes(key)){
+            bancaDetails[key] = bancaVal[key];
+          }
+        });
+        dispatch(bancaListAction.getBancaData(bancaDetails));
+       }
+      }
+     if(response.products[0].product_category === 'PL'){
+        if(response.applicants.rbp_applied_rate_a_1) {dispatch(rateAction.updateAR(response.applicants.rbp_applied_rate_a_1))}
+        if(response.applicants.rbp_effective_Interest_rate_a_1) { dispatch(rateAction.updateEIR(response.applicants.rbp_effective_Interest_rate_a_1)) }
+      }
+        setFieldsComponent(true);
+        let stageTo = response.application.stage.page_id;
+        if (
+          response.applicant_documents &&
+          response.applicant_documents[0] &&
+          response.applicant_documents[0].document_list &&
+          response.applicant_documents[0].document_list.length <= 0
+        ) {
+          delete response.applicant_documents;
+        }
+ 
+        dispatch(
+          stagesAction.getStage({
+            id: stageTo,
+            formConfig: response,
+          })
+        );
+ 
+        if (stageTo === "ssf-1" && response.application.journey_type) {
+          stageTo = nextStage(stageTo, response.application.journey_type);
+          dispatch(
+            stagesAction.getStage({
+              id: stageTo,
+              formConfig: response,
+            })
+          );
+        }
+        dispatch(referralcodeAction.setReferralId(response.application.referral_id_2));
+        dispatch(stagesAction.updateTaxFields(response.applicants));
+        dispatch(bancaListAction.getBancaData(response.applicants));
+        dispatch(stagesAction.updateUserInputFields(response.applicants));
+        dispatch(taxAction.updateTax(response.applicants));
+        dispatch(lovRequests(response, stageTo));
+      }
+    }); 
+    } else if (getUrl.getParameterByName("auth") === "upload") {
+      setFieldsUpload(true);
+      dispatch(urlParamAction.isUpload(true))
+      dispatch(
+        authAction.getSession({
+         sessionuid: sessionStorage.getItem("session_id"),
+        })
+      );
+      const refNo = sessionStorage.getItem("ref");
+      dispatch(urlParamAction.getAuthorize({ applicationRefNo: refNo }));
+      sessionStorage.removeItem("session_id");
+      sessionStorage.removeItem("ref");
+      dispatch(uploadRequest(refNo)).then(async (response: any) => {
+        if (response) {
+          setFieldsComponent(true);
+         // const stageTo = response.application.stage.page_id;
+         
+          if (
+            response.applicant_documents &&
+            response.applicant_documents[0] &&
+            response.applicant_documents[0].document_list &&
+            response.applicant_documents[0].document_list.length <= 0
+          ) {delete response.applicant_documents;
+          }
+          dispatch(
+            stagesAction.getStage({
+              id: 'doc',
+              formConfig: response,
+            })
+          );
+        }
+      });
+    } else {
+      dispatch(getClientInfo()).then(async (response: any) => {
+        if (response === 'ibankingNTC') {
+          setNtcIbanking(true);
+          dispatch(dispatchLoader(false));
+        }
+        else {          
+          setFieldsComponent(true);
+          if (response === 'ibankingETC') {
+            dispatch(dispatchLoader(false));
+          } 
+          else if (response === 'ibankingMyinfoCC') {     
+             navigate("sg/employment");
+           }
+           else if (response === 'ibankingMyinfoPL') {     
+            navigate("sg/loan-calculator")
+          }
+           else if (response) {
+             navigate("sg/super-short-form");
+          }
+      }
+      });
+    }
+ 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() =>{
+ 
+    if(stageSelector && stageSelector[0] && stageSelector[0].stageInfo.application.refer){
+      dispatch(referralcodeAction.setReferralFlag(stageSelector[0].stageInfo.application.refer));
+    }
+    if(stageSelector && stageSelector[0]  && stageSelector[0].stageInfo.application.referId){
+      if(referralcodeSelector && !(referralcodeSelector.referId)){
+        dispatch(referralcodeAction.setReferralId(stageSelector[0].stageInfo.application.referId));
+      }
+    }
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[stageSelector && stageSelector[0] && stageSelector[0].stageInfo.application])
+ 
   return (
     <>
-    
-      <div className="date">
-        <label htmlFor={props.data.logical_field_name}>
-          {props.data.rwb_label_name}
-        </label>
-        <div className={`date__inputs ${props.data.editable ? 'date__inputs--disabled':''}`} id={fieldIdAppend(props)}>
-          <input
-            placeholder="DD"
-            minLength={2}
-            maxLength={2}
-            type="tel"
-            value={date.DD} 
-            // required={
-            //   validate ? true : false
-            // }
-            // pattern={pattern}
-
-            onChange={(event) => changeHandler(event, "DD")}
-            onKeyPress={(event) =>
-              allowOnlyCharacter(event, props.data.logical_field_name)
-            }
-            onBlur={(event) => bindHandler(event, "DD")}
-            disabled={props.data.editable}
-            onFocus={focusHandler.bind(this, props.data.logical_field_name)}
-          /><span className="date__seperator"></span>
-          <input
-            ref={monthRef}
-            placeholder="MM"
-            minLength={2}
-            maxLength={2}
-            type="tel"
-            value={date.MM}
-            // required={
-            //   validate ? true : false
-            // }
-            // pattern={pattern}
-
-            onChange={(event) => changeHandler(event, "MM")}
-            onKeyPress={(event) =>
-              allowOnlyCharacter(event, props.data.logical_field_name)
-            }
-            onBlur={(event) => bindHandler(event, "MM")}
-            disabled={props.data.editable}
-            onFocus={focusHandler.bind(this, props.data.logical_field_name)}
-          /><span className="date__seperator"></span>
-          <input
-            ref={yearRef}
-            placeholder="YYYY"
-            minLength={4}
-            maxLength={4}
-            type="tel"
-            value={date.YYYY}
-            // required={
-            //   validate ? true : false
-            // }
-            pattern={validate? "^[12][0-9]{3}$":""}
-            onChange={(event) => changeHandler(event, "YYYY")}
-            onKeyPress={(event) =>
-              allowOnlyCharacter(event, props.data.logical_field_name)
-            }
-            disabled={props.data.editable}
-            onFocus={focusHandler.bind(this, props.data.logical_field_name)}
-          />
+      {(urlInvalid || myInfoAuthSelector  || ntcIbanking) && (
+        <PopupModel displayPopup={myInfoAuthSelector || urlInvalid  || ntcIbanking}>
+          {urlInvalid ? <Model name="globalError" /> : <MyinfoSingpassLogin />}
+        </PopupModel>
+      )}
+ 
+      {stageSelector &&
+        stageSelector[0] &&
+        stageSelector[0].stageId === "bd-3" &&
+        otpShowSelector && <OTPModel />}
+ 
+      {stageSelector && stageSelector.length > 0 && !otpShowSelector && (
+        <div className="app">
+          <div className="app__header">
+            <div ref={headerHeight}>
+              <Header />
+            </div>
+          </div>
+          <div
+            className={`app__body ${pointer ? "pointer-none" : ""} ${stageSelector[0].stageInfo.products[0].product_type === '280' && applicationJourney === 'ETC' ? "app__body-sub" : ""}`}
+            style={{
+              marginTop: marginTop + "px",
+              height: `calc(100dvh - ${marginTop + isMobileView}px)`,
+            }}
+          >
+            <div className="wrapper">
+              <div>{fieldsComponent && <Fields />}</div>
+              <div>{/* <NeedHelp /> */}</div>
+            </div>
+          </div>
         </div>
-      </div>
-      {error && <span className="error-msg">{error}</span>}
+      )}
     </>
   );
 };
-
-export default Date;
-
-
-const validateForm = (e: FormEvent<HTMLFormElement> | null) => {
-    if (e && e.currentTarget.checkValidity()) {
-      setIsFormValid(true);
-    } else {
-      setIsFormValid(false);
-    }
-  };
+ 
+export default Dashboard;
