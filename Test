@@ -2,28 +2,17 @@ import React from "react";
 import { render } from "@testing-library/react";
 import { Provider } from "react-redux";
 import configureStore from "redux-mock-store";
-import Header from "./Header";
+import { Header } from "./Header";
 import { getUrl } from "../../../utils/common/change.utils";
 
-// Mocking dependencies
+// Mocking the necessary utilities
 jest.mock("../../../utils/common/change.utils", () => ({
   getUrl: {
-    getParameterByName: jest.fn(),
+    getParameterByName: jest.fn().mockReturnValue(null), // You can adjust based on your test case
   },
 }));
 
-jest.mock("../../../utils/store/store", () => ({
-  store: {
-    getState: jest.fn(() => ({
-      stages: { isDocumentUpload: false, stages: [{ stageId: "testStage", stageInfo: { application: { journey_type: "ETC" }, products: [{ name: "Product Name", product_category: "CC", product_type: "280" }] } }] },
-    })),
-  },
-}));
-
-jest.mock("../../../utils/common/header-titles", () =>
-  jest.fn(() => "Mocked Header Title")
-);
-
+// Mock the components used inside Header
 jest.mock("../../../shared/components/close/close", () => () => (
   <div data-testid="close-button">Close Button</div>
 ));
@@ -32,12 +21,17 @@ jest.mock("../../../shared/components/logo/logo", () => () => (
   <div data-testid="logo">Logo</div>
 ));
 
+jest.mock("../../../utils/common/header-titles", () =>
+  jest.fn(() => "Mocked Header Title")
+);
+
 const mockStore = configureStore([]);
 
 describe("Header Component", () => {
   let store: any;
 
   beforeEach(() => {
+    // Mocking the store structure for stages
     store = mockStore({
       stages: {
         stages: [
@@ -59,7 +53,27 @@ describe("Header Component", () => {
       },
     });
 
-    (getUrl.getParameterByName as jest.Mock).mockReturnValue(null);
+    // Mocking the store.getState() call to return the correct value
+    jest.spyOn(store, "getState").mockReturnValue({
+      stages: {
+        stages: [
+          {
+            stageId: "testStage",
+            stageInfo: {
+              application: { journey_type: "ETC" },
+              products: [
+                {
+                  name: "Product Name",
+                  product_category: "CC",
+                  product_type: "280",
+                },
+              ],
+            },
+          },
+        ],
+        journeyType: "ETC",
+      },
+    });
   });
 
   it("renders without crashing", () => {
@@ -69,8 +83,9 @@ describe("Header Component", () => {
       </Provider>
     );
 
+    // Check if the mocked title is rendered correctly
     expect(getByText("Mocked Header Title")).toBeInTheDocument();
   });
 
-  // Additional tests...
+  // Additional test cases can go here
 });
