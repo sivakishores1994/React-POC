@@ -2,111 +2,53 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import configureStore from "redux-mock-store";
-import { Header } from "./Header";
+import Header from "./Header";
 
-// Mock `store.getState`
+// Mock `resumeHeaderText`
+jest.mock("../../../utils/common/constants", () => ({
+  resumeHeaderText: {
+    HEADER_TEXT: {
+      resume: "Resume Application",
+      resumeSubHeader: "You can resume your application where you left off.",
+    },
+  },
+}));
+
+// Mock `store`
 jest.mock("../../../utils/store/store", () => ({
   store: {
     getState: jest.fn(() => ({
       stages: {
-        stages: [
-          {
-            stageId: "testStage",
-            stageInfo: {
-              application: { journey_type: "ETC" },
-              products: [
-                {
-                  name: "Product Name",
-                  product_category: "CC",
-                  product_type: "280",
-                },
-              ],
-            },
-          },
-        ],
-        journeyType: "ETC",
+        stages: [],
+        journeyType: "",
         isDocumentUpload: false,
       },
     })),
   },
 }));
 
-// Mock utilities
-jest.mock("../../../utils/common/change.utils", () => ({
-  getUrl: {
-    getParameterByName: jest.fn().mockReturnValue(null), // You can adjust based on your test case
-  },
-}));
-
-jest.mock("../../../utils/common/header-titles", () =>
-  jest.fn(() => "Mocked Header Title")
-);
-
 const mockStore = configureStore([]);
 
-describe("Header Component", () => {
+describe("Header Component - Pending Application Path", () => {
   let store: any;
 
   beforeEach(() => {
     store = mockStore({
       stages: {
-        stages: [
-          {
-            stageId: "testStage",
-            stageInfo: {
-              application: { journey_type: "ETC" },
-              products: [
-                {
-                  name: "Product Name",
-                  product_category: "CC",
-                  product_type: "280",
-                },
-              ],
-            },
-          },
-        ],
-        journeyType: "ETC",
+        stages: [],
+        journeyType: "",
         isDocumentUpload: false,
       },
     });
   });
 
-  it("sets isMobileView based on window width", () => {
-    // Mock window.innerWidth
-    Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 500 });
-
-    // Render the component
-    render(
-      <Provider store={store}>
-        <Header />
-      </Provider>
-    );
-
-    // Trigger resize event to test the effect
-    window.dispatchEvent(new Event("resize"));
-
-    // The isMobileView state is private, so verify its effect on the DOM
-    expect(screen.getByTestId("header")).toBeInTheDocument();
-    // You may add further checks based on the component's behavior for mobile view
-  });
-
-  it("sets wavesStyle based on header element heights", () => {
-    // Mock DOM structure
-    const mockGetElementsByClassName = jest.fn().mockImplementation((className) => {
-      if (className === "header__product-info") {
-        return [{ offsetHeight: 50 }]; // Mock product info height
-      }
-      if (className === "header__stage-info") {
-        return [{ offsetHeight: 100 }]; // Mock stage info height
-      }
-      return [];
+  it("sets header and subheader text for /pending-application", () => {
+    // Mock `window.location.pathname`
+    Object.defineProperty(window, "location", {
+      writable: true,
+      value: { pathname: "/pending-application" },
     });
 
-    // Mock getElementsByClassName
-    jest
-      .spyOn(global.document, "getElementsByClassName")
-      .mockImplementation(mockGetElementsByClassName);
-
     // Render the component
     render(
       <Provider store={store}>
@@ -114,11 +56,10 @@ describe("Header Component", () => {
       </Provider>
     );
 
-    // Simulate a DOM update
-    jest.advanceTimersByTime(100);
-
-    // Check that wavesStyle is set
-    // Note: You need to test DOM changes reflecting this style
-    // (depends on how it's applied in your component)
+    // Verify header and subheader text
+    expect(screen.getByText("Resume Application")).toBeInTheDocument();
+    expect(
+      screen.getByText("You can resume your application where you left off.")
+    ).toBeInTheDocument();
   });
 });
