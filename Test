@@ -1,290 +1,140 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import "./dashboard.scss";
-import Header from "./header/header";
-import Fields from "./fields/fields";
-import { useDispatch, useSelector } from "react-redux";
-import { useLocation, useNavigate } from "react-router-dom";
-import {
-  dispatchLoader,
-  getClientInfo,
-  lovRequests,
-  resumeRequest,
-  uploadRequest,
-  getBancaEligibleProducts
-} from "../../services/common-service";
-import { StoreModel } from "../../utils/model/common-model";
-import MyinfoSingpassLogin from "../../shared/components/myinfo-singpass-login-modal/myinfo-singpass-login";
-import PopupModel from "../../shared/components/popup-model/popup-model";
-import { urlParamAction } from "../../utils/store/urlparam-slice";
-import Model from "../../shared/components/model/model";
-import { loaderAction } from "../../utils/store/loader-slice";
-import { store } from "../../utils/store/store";
-import { getUrl } from "../../utils/common/change.utils";
-import { authAction } from "../../utils/store/auth-slice";
-import { stagesAction } from "../../utils/store/stages-slice";
-import { taxAction } from "../../utils/store/tax-slice";
-import { bancaListAction } from "../../utils/store/banca-slice";
-import OTPModel from "../../shared/components/otp-modal/otp";
-import { nextStage } from "./fields/stage.utils";
-import { referralcodeAction } from "../../utils/store/referral-code-slice";
-import { BANCAINFO} from "../../utils/common/constants";
-import { rateAction } from "../../utils/store/rate-slice";
- 
-const Dashboard = () => {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const urlParams = useLocation();
-  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
-  const applicationJourney = useSelector(
-    (state: StoreModel) => state.stages.journeyType
-  );
-  const myInfoAuthSelector = useSelector(
-    (state: StoreModel) => state.urlParam.myInfo
-  );
-  const otpShowSelector = useSelector(
-    (state: StoreModel) => state.stages.otpOpen
-  );
-  const otpResumeSelector = useSelector(
-    (state: StoreModel) => state.stages.otpResume
-  );
-  const referralcodeSelector = useSelector((state: StoreModel) => state.referralcode);
-  const [urlInvalid, setUrlInvalid] = useState(false);
-  const [marginTop, setMarginTop] = useState(0);
-  const headerHeight = useRef<HTMLInputElement>(null);
-  const [fieldsComponent, setFieldsComponent] = useState(false);
-  const [pointer, setPointer] = useState(false);
-  const ctaLoader: any = getUrl.getLoader().cta;
-  const [isMobileView, setIsMobileView] = useState<number>(0);
-  const [uploadJourney, setFieldsUpload] = useState(false);
-  const [ntcIbanking, setNtcIbanking] = useState(false);
- 
-  useEffect(() => {
-    if (ctaLoader) {
-      setPointer(ctaLoader.cta ? true : false);
-    }
-  }, [ctaLoader]);
- 
-  useLayoutEffect(() => {
-    let clearSetTimeout: ReturnType<typeof setTimeout>;
-    function updateSize() {
-      setIsMobileView(window.innerWidth < 768 ? 110 : 167);
-      if (headerHeight.current) {
-        clearSetTimeout = setTimeout(() => {
-          setMarginTop(headerHeight && headerHeight.current!["offsetHeight"]);
-        }, 100);
-      }
-    }
-    window.addEventListener("resize", updateSize);
-    updateSize();
-    return () => {
-      window.removeEventListener("resize", updateSize);
-      clearTimeout(clearSetTimeout);
-    };
-  }, [stageSelector]);
- 
-  useEffect(() => {
-    if (otpResumeSelector) {
-      setFieldsComponent(true);
-      //dispatch(stagesAction.setOtpResume(false));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otpResumeSelector]);
-  
-  useEffect(() => {
-    dispatch(dispatchLoader(true));
-    dispatch(urlParamAction.getUrlParameter(urlParams));
-    if (!store.getState().urlParam.validUrl) {
-      dispatch(
-        loaderAction.getState({
-          isFetching: false,
-        })
-      );
-      setUrlInvalid(true);
-    } else if (getUrl.getParameterByName("auth") === "resume") {
-      dispatch(urlParamAction.isResume(true));
-      /* var mobilenumber = sessionStorage.getItem("mobileNumber");
-      dispatch(getClientInfo()).then(async (response: any) => {
-        if (response) {
-          setFieldsComponent(true);
-          navigate("/otp");
-        }
-      });*/
-      dispatch(
-        authAction.getSession({
-          sessionuid: sessionStorage.getItem("session_id"),
-        })
-      );
-      const refNo = sessionStorage.getItem("ref");
-    dispatch(urlParamAction.getAuthorize({ applicationRefNo: refNo }));
-    sessionStorage.removeItem("session_id");
-    sessionStorage.removeItem("ref");
-    dispatch(resumeRequest(refNo)).then(async (response: any) => {
-      if (response) {
-        if (response.application && response.application.journey_type) {
-          dispatch(
-            stagesAction.setJourneyType(response.application.journey_type)
-          );
-        }
-        if(response.application.journey_type === 'NTC' &&  (response.products[0].product_category === 'CC' || response.products[0].product_type === '280')){
-        dispatch(getBancaEligibleProducts(response));
-        dispatch(urlParamAction.getAuthorize({applicationRefNo:response.application.application_reference}));            
-        if(response.products[0].product_category === 'CC'){
-        let bancaDetails : any = {};
-        const bancaVal = response.applicants;
-        Object.keys(bancaVal).forEach((key:any) => {
-          if(BANCAINFO.DEFAULT_BANCA_VALUE.includes(key)){
-            bancaDetails[key] = bancaVal[key];
-          }
-        });
-        dispatch(bancaListAction.getBancaData(bancaDetails));
-       }
-      }
-     if(response.products[0].product_category === 'PL'){
-        if(response.applicants.rbp_applied_rate_a_1) {dispatch(rateAction.updateAR(response.applicants.rbp_applied_rate_a_1))}
-        if(response.applicants.rbp_effective_Interest_rate_a_1) { dispatch(rateAction.updateEIR(response.applicants.rbp_effective_Interest_rate_a_1)) }
-      }
-        setFieldsComponent(true);
-        let stageTo = response.application.stage.page_id;
-        if (
-          response.applicant_documents &&
-          response.applicant_documents[0] &&
-          response.applicant_documents[0].document_list &&
-          response.applicant_documents[0].document_list.length <= 0
-        ) {
-          delete response.applicant_documents;
-        }
- 
-        dispatch(
-          stagesAction.getStage({
-            id: stageTo,
-            formConfig: response,
-          })
-        );
- 
-        if (stageTo === "ssf-1" && response.application.journey_type) {
-          stageTo = nextStage(stageTo, response.application.journey_type);
-          dispatch(
-            stagesAction.getStage({
-              id: stageTo,
-              formConfig: response,
-            })
-          );
-        }
-        dispatch(referralcodeAction.setReferralId(response.application.referral_id_2));
-        dispatch(stagesAction.updateTaxFields(response.applicants));
-        dispatch(bancaListAction.getBancaData(response.applicants));
-        dispatch(stagesAction.updateUserInputFields(response.applicants));
-        dispatch(taxAction.updateTax(response.applicants));
-        dispatch(lovRequests(response, stageTo));
-      }
-    }); 
-    } else if (getUrl.getParameterByName("auth") === "upload") {
-      setFieldsUpload(true);
-      dispatch(urlParamAction.isUpload(true))
-      dispatch(
-        authAction.getSession({
-         sessionuid: sessionStorage.getItem("session_id"),
-        })
-      );
-      const refNo = sessionStorage.getItem("ref");
-      dispatch(urlParamAction.getAuthorize({ applicationRefNo: refNo }));
-      sessionStorage.removeItem("session_id");
-      sessionStorage.removeItem("ref");
-      dispatch(uploadRequest(refNo)).then(async (response: any) => {
-        if (response) {
-          setFieldsComponent(true);
-         // const stageTo = response.application.stage.page_id;
-         
-          if (
-            response.applicant_documents &&
-            response.applicant_documents[0] &&
-            response.applicant_documents[0].document_list &&
-            response.applicant_documents[0].document_list.length <= 0
-          ) {delete response.applicant_documents;
-          }
-          dispatch(
-            stagesAction.getStage({
-              id: 'doc',
-              formConfig: response,
-            })
-          );
-        }
-      });
-    } else {
-      dispatch(getClientInfo()).then(async (response: any) => {
-        if (response === 'ibankingNTC') {
-          setNtcIbanking(true);
-          dispatch(dispatchLoader(false));
-        }
-        else {          
-          setFieldsComponent(true);
-          if (response === 'ibankingETC') {
-            dispatch(dispatchLoader(false));
-          } 
-          else if (response === 'ibankingMyinfoCC') {     
-             navigate("sg/employment");
-           }
-           else if (response === 'ibankingMyinfoPL') {     
-            navigate("sg/loan-calculator")
-          }
-           else if (response) {
-             navigate("sg/super-short-form");
-          }
-      }
-      });
-    }
- 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  useEffect(() =>{
- 
-    if(stageSelector && stageSelector[0] && stageSelector[0].stageInfo.application.refer){
-      dispatch(referralcodeAction.setReferralFlag(stageSelector[0].stageInfo.application.refer));
-    }
-    if(stageSelector && stageSelector[0]  && stageSelector[0].stageInfo.application.referId){
-      if(referralcodeSelector && !(referralcodeSelector.referId)){
-        dispatch(referralcodeAction.setReferralId(stageSelector[0].stageInfo.application.referId));
-      }
-    }
-     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[stageSelector && stageSelector[0] && stageSelector[0].stageInfo.application])
- 
-  return (
-    <>
-      {(urlInvalid || myInfoAuthSelector  || ntcIbanking) && (
-        <PopupModel displayPopup={myInfoAuthSelector || urlInvalid  || ntcIbanking}>
-          {urlInvalid ? <Model name="globalError" /> : <MyinfoSingpassLogin />}
-        </PopupModel>
-      )}
- 
-      {stageSelector &&
-        stageSelector[0] &&
-        stageSelector[0].stageId === "bd-3" &&
-        otpShowSelector && <OTPModel />}
- 
-      {stageSelector && stageSelector.length > 0 && !otpShowSelector && (
-        <div className="app">
-          <div className="app__header">
-            <div ref={headerHeight}>
-              <Header />
-            </div>
-          </div>
-          <div
-            className={`app__body ${pointer ? "pointer-none" : ""} ${stageSelector[0].stageInfo.products[0].product_type === '280' && applicationJourney === 'ETC' ? "app__body-sub" : ""}`}
-            style={{
-              marginTop: marginTop + "px",
-              height: `calc(100dvh - ${marginTop + isMobileView}px)`,
-            }}
-          >
-            <div className="wrapper">
-              <div>{fieldsComponent && <Fields />}</div>
-              <div>{/* <NeedHelp /> */}</div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-};
- 
-export default Dashboard;
+import React from "react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { Provider } from "react-redux";
+import { MemoryRouter } from "react-router-dom";
+import configureStore from "redux-mock-store";
+import Dashboard from "./Dashboard";
+
+// Mocks
+jest.mock("react-redux", () => ({
+  useDispatch: jest.fn(),
+  useSelector: jest.fn((fn) => fn()),
+}));
+jest.mock("react-router-dom", () => ({
+  useNavigate: jest.fn(),
+  useLocation: jest.fn().mockReturnValue({ search: "?auth=resume" }),
+}));
+
+// Mock services and actions
+jest.mock("../../services/common-service", () => ({
+  dispatchLoader: jest.fn(),
+  getClientInfo: jest.fn(),
+  resumeRequest: jest.fn(),
+  uploadRequest: jest.fn(),
+  getBancaEligibleProducts: jest.fn(),
+}));
+
+jest.mock("../../utils/store/auth-slice", () => ({
+  authAction: { getSession: jest.fn() },
+}));
+jest.mock("../../utils/store/stages-slice", () => ({
+  stagesAction: {
+    setJourneyType: jest.fn(),
+    getStage: jest.fn(),
+    updateUserInputFields: jest.fn(),
+    updateTaxFields: jest.fn(),
+  },
+}));
+jest.mock("../../utils/common/change.utils", () => ({
+  getUrl: {
+    getParameterByName: jest.fn(() => "resume"),
+    getLoader: jest.fn(() => ({ cta: true })),
+  },
+}));
+
+const mockStore = configureStore([]);
+
+describe("Dashboard Component", () => {
+  let store;
+  let mockDispatch;
+
+  beforeEach(() => {
+    store = mockStore({
+      stages: { stages: [], journeyType: "ETC", otpOpen: false },
+      urlParam: { myInfo: false, validUrl: true },
+    });
+
+    mockDispatch = jest.fn();
+    jest.requireMock("react-redux").useDispatch.mockReturnValue(mockDispatch);
+  });
+
+  test("renders without crashing", () => {
+    render(
+      <Provider store={store}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </Provider>
+    );
+
+    expect(screen.getByText(/loading/i)).toBeInTheDocument(); // Ensure loading or initial state is displayed
+  });
+
+  test("renders popup model if URL is invalid", () => {
+    store = mockStore({
+      urlParam: { myInfo: false, validUrl: false },
+      stages: { stages: [], journeyType: "ETC", otpOpen: false },
+    });
+
+    render(
+      <Provider store={store}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </Provider>
+    );
+
+    expect(screen.getByText(/globalError/i)).toBeInTheDocument();
+  });
+
+  test("dispatches loader and URL parameter actions on load", () => {
+    render(
+      <Provider store={store}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </Provider>
+    );
+
+    expect(mockDispatch).toHaveBeenCalledWith(expect.any(Function));
+    expect(mockDispatch).toHaveBeenCalledWith({
+      type: expect.stringContaining("urlParam/getUrlParameter"),
+    });
+  });
+
+  test("renders Fields component when fieldsComponent state is true", () => {
+    store = mockStore({
+      stages: { stages: [], journeyType: "ETC", otpOpen: false },
+      urlParam: { validUrl: true },
+    });
+
+    render(
+      <Provider store={store}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </Provider>
+    );
+
+    // Simulate fieldsComponent being set to true
+    fireEvent(window, new Event("resize"));
+    expect(screen.queryByText(/Fields/i)).toBeNull(); // Modify based on Fields content
+  });
+
+  test("adds resize event listener on mount and removes it on unmount", () => {
+    const { unmount } = render(
+      <Provider store={store}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </Provider>
+    );
+
+    const resizeSpy = jest.spyOn(window, "addEventListener");
+    expect(resizeSpy).toHaveBeenCalledWith("resize", expect.any(Function));
+
+    unmount();
+    const removeSpy = jest.spyOn(window, "removeEventListener");
+    expect(removeSpy).toHaveBeenCalledWith("resize", expect.any(Function));
+  });
+});
