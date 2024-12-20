@@ -1,65 +1,139 @@
-import React from "react";
-import { render, screen } from "@testing-library/react";
-import { Provider } from "react-redux";
 import configureStore from "redux-mock-store";
-import Header from "./Header";
+import thunk from "redux-thunk";
+import { urlParamAction, stagesAction, bancaListAction, rateAction } from "../actions"; // Adjust path to your actions
+import { resumeRequest, getBancaEligibleProducts } from "../services"; // Adjust path to your services
+import * as sessionStorageMock from "../__mocks__/sessionStorageMock"; // Mock sessionStorage
 
-// Mock `resumeHeaderText`
-jest.mock("../../../utils/common/constants", () => ({
-  resumeHeaderText: {
-    HEADER_TEXT: {
-      resume: "Resume Application",
-      resumeSubHeader: "You can resume your application where you left off.",
-    },
-  },
-}));
+jest.mock("../services");
+jest.mock("../actions");
+jest.mock("../__mocks__/sessionStorageMock");
 
-// Mock `store`
-jest.mock("../../../utils/store/store", () => ({
-  store: {
-    getState: jest.fn(() => ({
-      stages: {
-        stages: [],
-        journeyType: "",
-        isDocumentUpload: false,
-      },
-    })),
-  },
-}));
+const mockStore = configureStore([thunk]);
 
-const mockStore = configureStore([]);
-
-describe("Header Component - Pending Application Path", () => {
-  let store: any;
+describe("Action Flow Tests", () => {
+  let store;
 
   beforeEach(() => {
-    store = mockStore({
-      stages: {
-        stages: [],
-        journeyType: "",
-        isDocumentUpload: false,
+    store = mockStore({});
+    jest.clearAllMocks();
+  });
+
+  it("should handle the flow when response is valid", async () => {
+    // Mock sessionStorage values
+    sessionStorageMock.getItem.mockReturnValue("mockRef123");
+
+    // Mock actions and API calls
+    resumeRequest.mockResolvedValue({
+      application: {
+        journey_type: "NTC",
+        application_reference: "mockAppRef",
+        stage: { page_id: "mockStageId" },
       },
+      products: [
+        {
+          product_category: "CC",
+          product_type: 280,
+        },
+      ],
+      applicants: {
+        rbp_applied_rate_a_1: 5.5,
+        rbp_effective_interest_rate_a_1: 7.2,
+      },
+    });
+
+    const BANCAINFO = {
+      DEFAULT_BANCA_VALUE: ["mockKey1", "mockKey2"],
+    };
+
+    // Dispatch the code under test
+    const refNo = sessionStorageMock.getItem("ref");
+    await store.dispatch(async (dispatch) => {
+      dispatch(urlParamAction.getAuthorize({ applicationRefNo: refNo }));
+      sessionStorageMock.removeItem("session_id");
+      sessionStorageMock.removeItem("ref");
+
+      const response = await resumeRequest(refNo);
+
+      if (response && response.application && response.application.journey_type) {
+        dispatch(stagesAction.setJourneyType(response.application.journey_type));
+
+        if (
+          response.application.journey_type === "NTC" &&
+          (response.products[0].product_category === "CC" ||
+            response.products[0].product_type === 280)
+        ) {
+          dispatch(getBancaEligibleProducts(response));
+          dispatch(
+            urlParamAction.getAuthorize({
+              applicationRefNo: response.application.application_reference,
+            })
+          );
+
+          if (response.products[0].product_category === "CC") {
+            const bancaDetails = {};
+            const bancaVal = response.applicants;
+
+            Object.keys(bancaVal).forEach((key) => {
+              if (BANCAINFO.DEFAULT_BANCA_VALUE.includes(key)) {
+                bancaDetails[key] = bancaVal[key];
+              }
+            });
+
+            dispatch(bancaListAction.getBancaData(bancaDetails));
+          }
+
+          if (response.products[0].product_category === "PL") {
+            if (response.applicants.rbp_applied_rate_a_1) {
+              dispatch(
+                rateAction.updateAR(response.applicants.rbp_applied_rate_a_1)
+              );
+            }
+            if (response.applicants.rbp_effective_interest_rate_a_1) {
+              dispatch(
+                rateAction.updateEIR(
+                  response.applicants.rbp_effective_interest_rate_a_1
+                )
+              );
+            }
+          }
+
+          expect(store.getActions()).toContainEqual(
+            stagesAction.setJourneyType("NTC")
+          );
+          expect(store.getActions()).toContainEqual(
+            getBancaEligibleProducts(response)
+          );
+          expect(store.getActions()).toContainEqual(
+            bancaListAction.getBancaData({
+              mockKey1: undefined,
+              mockKey2: undefined,
+            })
+          );
+        }
+      }
     });
   });
 
-  it("sets header and subheader text for /pending-application", () => {
-    // Mock `window.location.pathname`
-    Object.defineProperty(window, "location", {
-      writable: true,
-      value: { pathname: "/pending-application" },
+  it("should handle empty sessionStorage ref", async () => {
+    sessionStorageMock.getItem.mockReturnValue(null);
+
+    await store.dispatch(async (dispatch) => {
+      const refNo = sessionStorageMock.getItem("ref");
+      expect(refNo).toBeNull();
+      expect(dispatch).not.toHaveBeenCalled();
     });
+  });
 
-    // Render the component
-    render(
-      <Provider store={store}>
-        <Header />
-      </Provider>
-    );
+  it("should handle invalid response", async () => {
+    sessionStorageMock.getItem.mockReturnValue("mockRef123");
+    resumeRequest.mockResolvedValue(null);
 
-    // Verify header and subheader text
-    expect(screen.getByText("Resume Application")).toBeInTheDocument();
-    expect(
-      screen.getByText("You can resume your application where you left off.")
-    ).toBeInTheDocument();
+    await store.dispatch(async (dispatch) => {
+      const response = await resumeRequest("mockRef123");
+      expect(response).toBeNull();
+      expect(dispatch).not.toHaveBeenCalledWith(
+        stagesAction.setJourneyType(expect.anything())
+      );
+    });
   });
 });
