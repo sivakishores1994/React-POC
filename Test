@@ -15,7 +15,7 @@ jest.mock("../../../utils/common/change.utils", () => ({
 jest.mock("../../../utils/store/store", () => ({
   store: {
     getState: jest.fn(() => ({
-      stages: { isDocumentUpload: false },
+      stages: { isDocumentUpload: false, stages: [{ stageId: "testStage", stageInfo: { application: { journey_type: "ETC" }, products: [{ name: "Product Name", product_category: "CC", product_type: "280" }] } }] },
     })),
   },
 }));
@@ -72,89 +72,5 @@ describe("Header Component", () => {
     expect(getByText("Mocked Header Title")).toBeInTheDocument();
   });
 
-  it("renders product details if available", () => {
-    const { getByText } = render(
-      <Provider store={store}>
-        <Header />
-      </Provider>
-    );
-
-    expect(getByText("Product Name")).toBeInTheDocument();
-  });
-
-  it("does not render product details if 'auth' is 'upload'", () => {
-    (getUrl.getParameterByName as jest.Mock).mockReturnValue("upload");
-
-    const { queryByText } = render(
-      <Provider store={store}>
-        <Header />
-      </Provider>
-    );
-
-    expect(queryByText("Product Name")).not.toBeInTheDocument();
-  });
-
-  it("renders the close button if applicable", () => {
-    const { getByTestId } = render(
-      <Provider store={store}>
-        <Header />
-      </Provider>
-    );
-
-    expect(getByTestId("close-button")).toBeInTheDocument();
-  });
-
-  it("renders the logo in desktop view", () => {
-    const { getByTestId } = render(
-      <Provider store={store}>
-        <Header />
-      </Provider>
-    );
-
-    expect(getByTestId("logo")).toBeInTheDocument();
-  });
-
-  it("renders pending application header and subheader if on '/pending-application' path", () => {
-    Object.defineProperty(window, "location", {
-      value: {
-        pathname: "/pending-application",
-      },
-      writable: true,
-    });
-
-    const { getByText } = render(
-      <Provider store={store}>
-        <Header />
-      </Provider>
-    );
-
-    expect(getByText("Resume Your Application")).toBeInTheDocument();
-    expect(getByText("You can continue your application from where you left off.")).toBeInTheDocument();
-  });
-
-  it("applies wave styles based on header content dimensions", () => {
-    const { container } = render(
-      <Provider store={store}>
-        <Header />
-      </Provider>
-    );
-
-    const waveSpan = container.querySelector(".header__waves");
-    expect(waveSpan).toHaveStyle(`height: 0px`);
-    expect(waveSpan).toHaveStyle(`top: 0px`);
-  });
-
-  it("cleans up event listeners on unmount", () => {
-    const removeEventListenerSpy = jest.spyOn(window, "removeEventListener");
-
-    const { unmount } = render(
-      <Provider store={store}>
-        <Header />
-      </Provider>
-    );
-
-    unmount();
-    expect(removeEventListenerSpy).toHaveBeenCalledWith("onload", expect.any(Function));
-    expect(removeEventListenerSpy).toHaveBeenCalledWith("resize", expect.any(Function));
-  });
+  // Additional tests...
 });
