@@ -1,83 +1,169 @@
-import { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
+import React from "react";
+import { render, fireEvent } from "@testing-library/react";
+import { Provider } from "react-redux";
+import configureStore from "redux-mock-store";
+import Footer from "./Footer";
 import { CONSTANTS } from "../../../utils/common/constants";
-import { KeyWithAnyModel, StoreModel } from "../../../utils/model/common-model";
-import "./footer.scss";
 import { getUrl } from "../../../utils/common/change.utils";
 
-const Footer = (props: KeyWithAnyModel) => {
-  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
-  const [backBtn, setBackBtn] = useState(false);
-  const [ctaSpinner, setCtaSpinner] = useState(false);
-  const urlEnpoint = getUrl.getUrlEndPoint();
+// Mocking dependencies
+jest.mock("../../../utils/common/change.utils", () => ({
+  getUrl: {
+    getUrlEndPoint: jest.fn(),
+  },
+}));
 
-  const backHandler = () => {
-    props.backHandler();
-  };
+const mockStore = configureStore([]);
 
-  useEffect(() => {
-    setCtaSpinner(
-      urlEnpoint === "acknowledge" || urlEnpoint === "preserve" ? true : false
+describe("Footer Component", () => {
+  let store: any;
+  let props: any;
+
+  beforeEach(() => {
+    store = mockStore({
+      stages: {
+        stages: [
+          {
+            stageId: "rp",
+            stageInfo: {
+              products: [
+                {
+                  product_category: "CC",
+                  product_type: "280",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    props = {
+      backHandler: jest.fn(),
+      journeyType: "ETC",
+      validateNxt: "",
+      otherMyinfo: false,
+      uploadJourney: false,
+    };
+
+    (getUrl.getUrlEndPoint as jest.Mock).mockReturnValue("acknowledge");
+  });
+
+  it("renders without crashing", () => {
+    const { getByText } = render(
+      <Provider store={store}>
+        <Footer {...props} />
+      </Provider>
     );
-  }, [urlEnpoint]);
 
-  useEffect(() => {
-    if (stageSelector && stageSelector.length > 0) {
-      const isEnableBackBtn =
-        stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.SSF_1 &&
-        stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.BD_1 &&
-        !(props.journeyType === 'NTC' && ((stageSelector[0].stageId == CONSTANTS.STAGE_NAMES.BD_3 && stageSelector[0].stageInfo.products[0].product_category == 'CC') ||
-        (stageSelector[0].stageId == CONSTANTS.STAGE_NAMES.LD_1 && stageSelector[0].stageInfo.products[0].product_type === '280')))
-        && !(props.journeyType === 'ETC' && stageSelector[0].stageInfo.products[0].product_type === '280'
-        && (stageSelector[0].stageId == CONSTANTS.STAGE_NAMES.LD_1 || stageSelector[0].stageId == CONSTANTS.STAGE_NAMES.AD_2))
-          ? true
-          : false;
-      setBackBtn(isEnableBackBtn);
-    }
-  }, [stageSelector]);
+    expect(getByText("Agree and Submit")).toBeInTheDocument();
+  });
 
-  useEffect(() => {
-    if (stageSelector && stageSelector.length > 0) {
-      if(props.journeyType === 'NTC' && ((stageSelector[0].stageId == CONSTANTS.STAGE_NAMES.BD_3 
-        && stageSelector[0].stageInfo.products[0].product_category == 'CC') ||
-        (stageSelector[0].stageId == CONSTANTS.STAGE_NAMES.LD_1 && stageSelector[0].stageInfo.products[0].product_type === '280'))){
-        setBackBtn(false);
-      }
-      else if(props.journeyType === 'ETC' && stageSelector[0].stageInfo.products[0].product_type === '280'
-          && (stageSelector[0].stageId == CONSTANTS.STAGE_NAMES.LD_1 || stageSelector[0].stageId == CONSTANTS.STAGE_NAMES.AD_2)){
-          setBackBtn(false);
-      } else if (
-        stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.SSF_1 &&
-        stageSelector[0].stageId !== CONSTANTS.STAGE_NAMES.BD_1 &&
-        !props.otherMyinfo
-      ) {
-        setBackBtn(true);
-      } else {
-        setBackBtn(props.otherMyinfo);
-      }
-    }
+  it("calls backHandler on back button click", () => {
+    props.backHandler = jest.fn();
+    store = mockStore({
+      stages: {
+        stages: [
+          {
+            stageId: "BD_2",
+            stageInfo: { products: [{ product_category: "CC", product_type: "280" }] },
+          },
+        ],
+      },
+    });
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.otherMyinfo]);
+    const { getByText } = render(
+      <Provider store={store}>
+        <Footer {...props} />
+      </Provider>
+    );
 
-  return (
-    <>
-      <div className="footer">
-        {backBtn && !props.uploadJourney && (
-          <div className="back" onClick={backHandler}>
-            <span className="arrow"></span> Back
-          </div>
-        )}
-        <button type="submit" className={`continue ${props.validateNxt}`}>
-          {ctaSpinner && <div className="circle-spinner"></div>}
-          {!ctaSpinner && stageSelector[0].stageId === "rp" || props.uploadJourney == true
-            ? "Agree and Submit"
-            : (props.journeyType === 'ETC' && stageSelector[0].stageId === CONSTANTS.STAGE_NAMES.LD_1 && stageSelector[0].stageInfo.products[0].product_type == '280')
-            ? "Proceed to Get Loan" : "Continue"}
-        </button>
-      </div>
-    </>
-  );
-};
+    const backButton = getByText("Back");
+    fireEvent.click(backButton);
 
-export default Footer;
+    expect(props.backHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows spinner when `urlEndpoint` is acknowledge or preserve", () => {
+    (getUrl.getUrlEndPoint as jest.Mock).mockReturnValue("acknowledge");
+
+    const { container } = render(
+      <Provider store={store}>
+        <Footer {...props} />
+      </Provider>
+    );
+
+    const spinner = container.querySelector(".circle-spinner");
+    expect(spinner).toBeInTheDocument();
+  });
+
+  it("hides back button when stageId is SSF_1", () => {
+    store = mockStore({
+      stages: {
+        stages: [
+          {
+            stageId: CONSTANTS.STAGE_NAMES.SSF_1,
+            stageInfo: {
+              products: [
+                {
+                  product_category: "CC",
+                  product_type: "280",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    const { queryByText } = render(
+      <Provider store={store}>
+        <Footer {...props} />
+      </Provider>
+    );
+
+    const backButton = queryByText("Back");
+    expect(backButton).not.toBeInTheDocument();
+  });
+
+  it("renders 'Proceed to Get Loan' button for ETC journeyType with specific conditions", () => {
+    store = mockStore({
+      stages: {
+        stages: [
+          {
+            stageId: CONSTANTS.STAGE_NAMES.LD_1,
+            stageInfo: {
+              products: [
+                {
+                  product_type: "280",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    props.journeyType = "ETC";
+
+    const { getByText } = render(
+      <Provider store={store}>
+        <Footer {...props} />
+      </Provider>
+    );
+
+    expect(getByText("Proceed to Get Loan")).toBeInTheDocument();
+  });
+
+  it("renders 'Agree and Submit' button when uploadJourney is true", () => {
+    props.uploadJourney = true;
+
+    const { getByText } = render(
+      <Provider store={store}>
+        <Footer {...props} />
+      </Provider>
+    );
+
+    expect(getByText("Agree and Submit")).toBeInTheDocument();
+  });
+});
