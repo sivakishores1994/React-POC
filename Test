@@ -1,362 +1,158 @@
-import { AppDispatch } from "../../../services/common-service";
-import { FindIndex, getUrl, authenticateType } from "../../../utils/common/change.utils";
-import { KeyWithAnyModel, RadioDependecyModel, StageDetails} from "../../../utils/model/common-model";
-import { fieldErrorAction } from "../../../utils/store/field-error-slice";
-import { stagesAction } from "../../../utils/store/stages-slice";
-import { getProductCategory } from "../../../services/common-service";
+import { getFields } from './path-to-get-fields';
+import { fieldErrorAction } from '../../../utils/store/field-error-slice';
+import { stagesAction } from '../../../utils/store/stages-slice';
+import configureStore from 'redux-mock-store';
+import thunk from 'redux-thunk';
 
-export const getFields = (getStages: Array<StageDetails>, radioResidency: RadioDependecyModel | null, employerOther?: any, userInputs?: any, bancaSelector?: KeyWithAnyModel): any => {
-    return (dispatch: AppDispatch) => {
-        let fields: Array<KeyWithAnyModel> | undefined;
-        let stageIndex : number | undefined;
-        if (getStages && getStages[0].stageInfo && getStages[0].stageInfo.fieldmetadata && getStages[0].stageInfo.fieldmetadata.data.stages) {
-            let stageId:any;
-            if(getStages[0].stageId === 'ad-2' && authenticateType() == "manual"){
-                stageId = "ad";  
-                stageIndex = 2;
-            }
-            else if(getStages[0].stageId === 'ad-2' && authenticateType() == "myinfo"){
-                stageId = "ad";  
-                stageIndex = 2;
-            }
-            else if(getStages[0].stageId === 'bd-1' ){
-                stageId = "bd";  
-                stageIndex = FindIndex(getStages[0].stageInfo, stageId);
-            }
-            else if(getStages[0].stageId === 'ssf-1' || getStages[0].stageId === "bd-2" || getStages[0].stageId === "bd-3"  && authenticateType() == "manual"){
-                stageId = "bd";
-                stageIndex = FindIndex(getStages[0].stageInfo, stageId);
-            }
-            else if((getStages[0].stageId === 'ssf-1' || getStages[0].stageId === 'bd-3') && authenticateType() == "myinfo"){
-                stageId = "bd";
-                stageIndex = FindIndex(getStages[0].stageInfo, stageId);
-            }
-            else{
-                stageId = getStages[0].stageId;
-                stageIndex =  getStages[0].stageInfo.fieldmetadata.data.stages.findIndex(
-                   (id: any) => id.stageId.toLowerCase() === stageId.toLowerCase()
-                 );
-               }
-            if(stageIndex !== undefined){
-                fields = getStages[0].stageInfo.fieldmetadata.data.stages[stageIndex].fields;
-            }
-        }
+const mockStore = configureStore([thunk]);
 
-        let ssfStages: Array<string> | null = null;
-        
-        if (radioResidency) {
-            if (radioResidency.logical_field_name === 'residency_status') {
-                const foreigner = ["passport_no"];
-                const singapore = ["NRIC"];
-                if (radioResidency.value === "CT" || radioResidency.value === "PR") {
-                    ssfStages = singapore;
-                    dispatch(fieldErrorAction.removeMandatoryFields(foreigner));
-                    dispatch(
-                        stagesAction.removeAddToggleField({
-                            removeFields: foreigner,
-                            newFields: singapore,
-                            value: getStages[0].stageInfo.applicants.NRIC_a_1 ? getStages[0].stageInfo.applicants.NRIC_a_1 : ''
-                        })
-                        
-                    );
-                } else if (radioResidency.value === "FR") {
-                    ssfStages = foreigner;
-                    dispatch(fieldErrorAction.removeMandatoryFields(singapore));
-                    dispatch(
-                        stagesAction.removeAddToggleField({
-                            removeFields: singapore,
-                            newFields: foreigner,
-                            value: getStages[0].stageInfo.applicants.passport_no_a_1 ? getStages[0].stageInfo.applicants.passport_no_a_1 : ''
-                        })
-                    );
-                }
-            }
-            else if (radioResidency.logical_field_name === 'work_type') {
-                const earner = ["name_of_employer", "nature_of_employer", "job_title","office_phone_number"];
-                const selfEmployed = ["name_of_business", "nature_of_employer", "job_title","office_phone_number"];
-                const userSelection = {
-                    logical_field_name: radioResidency.logical_field_name, 
-                    value: radioResidency.value
-                };
-                dispatch(stagesAction.resetDefaultValue(userSelection));
-                dispatch(stagesAction.resetNewAndOldFields());
-                if (radioResidency.value === 'O') {
-                    ssfStages = null;
-                    const mergedFields = earner.concat(selfEmployed.filter(item => earner.every(value => value !== item)));
-                    dispatch(fieldErrorAction.removeMandatoryFields(mergedFields));
-                    dispatch(
-                        stagesAction.removeAddToggleField({
-                            removeFields: mergedFields,
-                            newFields: [],
-                            value: ''
-                        })
-                    );
-                } else if (radioResidency.value === 'S' || radioResidency.value === 'C') {
-                    ssfStages = earner;
-                    dispatch(fieldErrorAction.removeMandatoryFields(selfEmployed));
-                    const valObj:any = {
-                        'nature_of_employer_a_1': '',
-                        'job_title_a_1': '',
-                        'name_of_employer_a_1': '',
-                        'office_phone_number_a_1': ''
-                    }
-                    for(let key in valObj) {
-                        valObj[key] = getUrl.getUserInputs()[key] || '';
-                    }
-                    dispatch(
-                        stagesAction.removeAddToggleField({
-                            removeFields: selfEmployed,
-                            newFields: earner,
-                            value: valObj
-                        })
-                    );
-                } else if (radioResidency.value === 'E') {
-                    ssfStages = selfEmployed;
-                    dispatch(fieldErrorAction.removeMandatoryFields(earner));
-                    const valObj:any = {
-                        'nature_of_employer_a_1': '',
-                        'job_title_a_1': '',
-                        'name_of_business_a_1': '',
-                        'office_phone_number_a_1': ''
-                    }
-                    for(let key in valObj) {
-                        valObj[key] = getUrl.getUserInputs()[key] || '';
-                    }
-                   dispatch(
-                        stagesAction.removeAddToggleField({
-                            removeFields: earner,
-                            newFields: selfEmployed,
-                            value: valObj
-                        })
-                    );
-                }
-            } else if (radioResidency.logical_field_name === 'casa_fatca_declaration') {
-                let sgYes: Array<string> = [];
-                let sgNo: Array<string> = [];
-                if (radioResidency.value === 'Y') {
-                    sgYes = ["tax_id_no"];
-                    sgNo = ["country_of_tax_residence", "crs_reason_code"];
-                } else if (radioResidency.value === 'N') {
-                    sgYes = ["tax_id_no", "country_of_tax_residence", "crs_reason_code"]
-                    sgNo = ["tax_id_no"];
-                    if (userInputs.applicants.tax_id_no_a_1) {
-                        sgYes = ["country_of_tax_residence", "tax_id_no"];
-                        sgNo = ["crs_reason_code"];
-                    } else if (userInputs.applicants.crs_reason_code_a_1 === "B00") {
-                        sgYes = ["country_of_tax_residence", "crs_reason_code", "crs_comments"]
-                        sgNo = ["tax_id_no"];
-                    } else if (userInputs.applicants.crs_reason_code_a_1 === "A00" || userInputs.applicants.crs_reason_code_a_1 === "C00") {
-                        sgYes = ["country_of_tax_residence", "crs_reason_code"]
-                        sgNo = ["tax_id_no", "crs_comments"];
-                    }
-                }
-                if(radioResidency.value === 'Y' || radioResidency.value === 'N'){
-                    sgYes.push("add_tax_residency_note");
-                    sgYes.push("add_tax_residency");
-                }
-                const userSelection = {
-                    logical_field_name: radioResidency.logical_field_name, 
-                    radioResidency: radioResidency.value
-                };
-                dispatch(stagesAction.resetDefaultValue(userSelection));
-                if (radioResidency.value === 'N' && getStages[0].stageInfo.applicants.nationality_a_1 !== "SGP") {
-                    ssfStages = [...sgYes, "nationality_add"];
-                } else {
-                    ssfStages = sgYes
-                    sgNo.push("nationality_add");
-                }
-                
-                dispatch(fieldErrorAction.removeMandatoryFields(sgNo));
-                dispatch(
-                    stagesAction.removeAddToggleField({
-                        removeFields: sgNo,
-                        newFields: sgYes,
-                        value: null
-                    })
-                );
-            } else if (radioResidency.logical_field_name === "preferred_limit") {
-                 let showFields: Array<string> = ['credit_limit_consent_info_8'];
-                 let removeFields: Array<string> = [];
-                const userSelection = {
-                    logical_field_name: radioResidency.logical_field_name,
-                    radioResidency: radioResidency.value
-                };
-                dispatch(stagesAction.resetDefaultValue(userSelection));
-                if(!radioResidency.value) {
-                    radioResidency.value = '0'
-                }
-                if (radioResidency.value === '0') {
-                    showFields = ['credit_limit_consent_info_8'];
-                    removeFields = ['preferred_credit_limit','credit_limit_consent_info_5'];
-                } else if (radioResidency.value === '1') {
-                    showFields = ['preferred_credit_limit','credit_limit_consent_info_5'];
-                    removeFields = ['credit_limit_consent_info_8'];
-                }
-                ssfStages = showFields;
-                dispatch(fieldErrorAction.removeMandatoryFields(removeFields));
-                dispatch(
-                    stagesAction.removeAddToggleField({
-                        removeFields: removeFields,
-                        newFields: showFields,
-                        value: ''
-                    })
-                );
-            } //ETC CLI Changes
-            else if (radioResidency.logical_field_name === "credit_limit_consent") {
-                let showFields: Array<string> = [];
-                let removeFields: Array<string> = [];
-                const userSelection = {
-                    logical_field_name: radioResidency.logical_field_name,
-                    radioResidency: radioResidency.value
-                };
-                dispatch(stagesAction.resetDefaultValue(userSelection));
-                if (radioResidency.value === 'Y') {
-                    showFields = ['work_type'];
-                    removeFields = ['embossed_name','myinfo_data_cli'];
-                    if(bancaSelector && bancaSelector.eligible_banca_insurances)
-                    {
-                        bancaSelector.eligible_banca_insurances.forEach((eligibleBancaInsurance: any) => {
-                            removeFields.push("insurance_consent_" + eligibleBancaInsurance);
-                        });
-                    }
-                } else if (radioResidency.value === 'N') {
-                    const productCategory = getProductCategory(getStages[0].stageInfo.products);
-                    if (getStages[0].stageInfo.applicants['banca_product_applicable_a_1'] === "Y") {
-                        if (getUrl.getJourneyType() !== "ETC" || productCategory !== 'PL') {
-                            showFields = ['embossed_name'];
-                            if(bancaSelector && bancaSelector.eligible_banca_insurances)
-                            {
-                                bancaSelector.eligible_banca_insurances.forEach((eligibleBancaInsurance: any) => {
-                                    showFields.push("insurance_consent_" + eligibleBancaInsurance);
-                                });
-                            }
-                        } else {
-                            if(bancaSelector && bancaSelector.eligible_banca_insurances)
-                            {
-                                bancaSelector.eligible_banca_insurances.forEach((eligibleBancaInsurance: any) => {
-                                    showFields.push("insurance_consent_" + eligibleBancaInsurance);
-                                });
-                            }
-                        }
-                    }
-                    else {
-                        if (getUrl.getJourneyType() !== "ETC" || productCategory !== 'PL') {
-                            showFields = ['embossed_name'];
-                        }
-                    }
-                    removeFields = ['work_type','name_of_employer','name_of_employer_other','name_of_business','job_title','nature_of_employer','myinfo_data_cli','office_phone_number'];
-                }
-                ssfStages = showFields;
-                dispatch(fieldErrorAction.removeMandatoryFields(removeFields));
-                dispatch(
-                    stagesAction.removeAddToggleField({
-                        removeFields: removeFields,
-                        newFields: showFields,
-                        value: ''
-                    })
-                );
-            } else if (radioResidency.logical_field_name === "preferred_limit_etc") {
-                let showFields: Array<string> = [];
-                let removeFields: Array<string> = [];
-                const userSelection = {
-                    logical_field_name: radioResidency.logical_field_name,
-                    radioResidency: radioResidency.value
-                };
-                dispatch(stagesAction.resetDefaultValue(userSelection));
-                if (radioResidency.value === '0') {
-                    showFields = [];
-                    removeFields = ['preferred_credit_limit_etc'];
-                } else if (radioResidency.value === '1') {
-                    showFields = ['preferred_credit_limit_etc'];
-                    removeFields = [];
-                }
-                ssfStages = showFields;
-                dispatch(fieldErrorAction.removeMandatoryFields(removeFields));
-                dispatch(
-                    stagesAction.removeAddToggleField({
-                        removeFields: removeFields,
-                        newFields: showFields,
-                        value: ''
-                    })
-                );
-            } else if (radioResidency.logical_field_name === "deposit_loan_to" || radioResidency.logical_field_name === "Transfer_amount_to" || radioResidency.logical_field_name === "transfer_amount_to") {
-                let showFields: Array<string> = [];
-                let removeFields: Array<string> = [];
-                const userSelection = {
-                    logical_field_name: radioResidency.logical_field_name,
-                    radioResidency: radioResidency.value
-                };
-                dispatch(stagesAction.resetDefaultValue(userSelection));
-                if (radioResidency.value === 'SCB Account') {
-                    showFields = ['scb_account_no', 're_enter_scb_account_no', 'enter_account_info'];
-                    removeFields = ['other_bank_name', 'other_bank_account_bt', 'reenter_other_bank_account_bt', 'other_bank_credit_card_bt', 'reenter_other_bank_credit_card_bt'];
-                } else if (radioResidency.value === 'Other Bank Account') {
-                    showFields = ['other_bank_name', 'other_bank_account_bt', 'reenter_other_bank_account_bt'];
-                    removeFields = ['scb_account_no', 're_enter_scb_account_no', 'enter_account_info', 'other_bank_credit_card_bt', 'reenter_other_bank_credit_card_bt'];
-                } else if (radioResidency.value === 'Other Bank Credit Card') {
-                    showFields = ['other_bank_name', 'other_bank_credit_card_bt', 'reenter_other_bank_credit_card_bt'];
-                    removeFields = ['scb_account_no', 're_enter_scb_account_no', 'other_bank_account_bt', 'reenter_other_bank_account_bt', ];
-                }
-                ssfStages = showFields;
-                dispatch(fieldErrorAction.removeMandatoryFields([...removeFields, "enter_account_info"]));
-                dispatch(
-                    stagesAction.removeAddToggleField({
-                        removeFields: removeFields,
-                        newFields: showFields,
-                        value: ''
-                    })
-                );
-            } else if (radioResidency.logical_field_name === "Customer_Agree_for_Phoenix_Limit_porting") {
-                let showFields: Array<string> = [];
-                let removeFields: Array<string> = [];
-                const userSelection = {
-                    logical_field_name: radioResidency.logical_field_name,
-                    radioResidency: radioResidency.value
-                };
-                dispatch(stagesAction.resetDefaultValue(userSelection));
-                if (radioResidency.value === 'N') {
-                    showFields = [];
-                    removeFields = ['min_limit'];
-                } else if (radioResidency.value === 'Y') {
-                    showFields = ['min_limit'];
-                    removeFields = [];
-                }
-                ssfStages = showFields;
-                dispatch(fieldErrorAction.removeMandatoryFields(removeFields));
-                dispatch(
-                    stagesAction.removeAddToggleField({
-                        removeFields: removeFields,
-                        newFields: showFields,
-                        value: ''
-                    })
-                );
-            }
-        } else if (employerOther === 'name_of_employer_other') {
-            ssfStages = ['name_of_employer_other'];
-            dispatch(
-                stagesAction.removeAddToggleField({
-                    removeFields: [],
-                    newFields: ssfStages,
-                    value: ''
-                })
-            );
-        } else if (employerOther === 'fields') {
-            ssfStages = null;
-            dispatch(fieldErrorAction.removeMandatoryFields(['name_of_employer_other']));
-            dispatch(
-                stagesAction.removeAddToggleField({
-                    removeFields: ['name_of_employer_other'],
-                    newFields: [],
-                    value: ''
-                })
-            );
-        } 
-        if (ssfStages && fields) {
-            dispatch(fieldErrorAction.getMandatoryFields(ssfStages));
-            return fields.filter((field: KeyWithAnyModel) =>
-                ssfStages!.includes(field.logical_field_name)
-            );
-        }
-        return null;
-    }
-}
+describe('getFields', () => {
+  let store: any;
+
+  beforeEach(() => {
+    store = mockStore({});
+    store.dispatch = jest.fn(); // Mock dispatch
+  });
+
+  it('should return fields for a valid stage and dispatch removeMandatoryFields actions', () => {
+    const mockStages = [
+      {
+        stageId: 'ad-2',
+        stageInfo: {
+          fieldmetadata: {
+            data: {
+              stages: [
+                {
+                  stageId: 'ad',
+                  fields: [{ logical_field_name: 'NRIC' }],
+                },
+              ],
+            },
+          },
+          applicants: { NRIC_a_1: 'S1234567A' },
+        },
+      },
+    ];
+
+    const mockRadioResidency = { logical_field_name: 'residency_status', value: 'CT' };
+
+    const result = getFields(mockStages, mockRadioResidency)(store.dispatch);
+
+    expect(result).toEqual([{ logical_field_name: 'NRIC' }]);
+    expect(store.dispatch).toHaveBeenCalledWith(fieldErrorAction.removeMandatoryFields(['passport_no']));
+    expect(store.dispatch).toHaveBeenCalledWith(
+      stagesAction.removeAddToggleField({
+        removeFields: ['passport_no'],
+        newFields: ['NRIC'],
+        value: 'S1234567A',
+      })
+    );
+  });
+
+  it('should return null if no matching fields are found', () => {
+    const mockStages = [
+      {
+        stageId: 'non-existent',
+        stageInfo: {
+          fieldmetadata: {
+            data: {
+              stages: [],
+            },
+          },
+        },
+      },
+    ];
+
+    const result = getFields(mockStages, null)(store.dispatch);
+
+    expect(result).toBeNull();
+  });
+
+  it('should handle work_type logic and dispatch actions correctly', () => {
+    const mockStages = [
+      {
+        stageId: 'bd-1',
+        stageInfo: {
+          fieldmetadata: {
+            data: {
+              stages: [
+                {
+                  stageId: 'bd',
+                  fields: [
+                    { logical_field_name: 'name_of_employer' },
+                    { logical_field_name: 'job_title' },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
+    ];
+
+    const mockRadioResidency = { logical_field_name: 'work_type', value: 'S' };
+
+    getFields(mockStages, mockRadioResidency)(store.dispatch);
+
+    expect(store.dispatch).toHaveBeenCalledWith(stagesAction.resetDefaultValue({ logical_field_name: 'work_type', value: 'S' }));
+    expect(store.dispatch).toHaveBeenCalledWith(stagesAction.resetNewAndOldFields());
+    expect(store.dispatch).toHaveBeenCalledWith(
+      fieldErrorAction.removeMandatoryFields(['name_of_business', 'nature_of_employer', 'job_title', 'office_phone_number'])
+    );
+    expect(store.dispatch).toHaveBeenCalledWith(
+      stagesAction.removeAddToggleField({
+        removeFields: ['name_of_business', 'nature_of_employer', 'job_title', 'office_phone_number'],
+        newFields: ['name_of_employer', 'nature_of_employer', 'job_title', 'office_phone_number'],
+        value: {
+          nature_of_employer_a_1: '',
+          job_title_a_1: '',
+          name_of_employer_a_1: '',
+          office_phone_number_a_1: '',
+        },
+      })
+    );
+  });
+
+  it('should handle preferred_limit logic and dispatch correct actions', () => {
+    const mockStages = [
+      {
+        stageId: 'bd-1',
+        stageInfo: {
+          fieldmetadata: {
+            data: {
+              stages: [
+                {
+                  stageId: 'bd',
+                  fields: [
+                    { logical_field_name: 'preferred_credit_limit' },
+                    { logical_field_name: 'credit_limit_consent_info_5' },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
+    ];
+
+    const mockRadioResidency = { logical_field_name: 'preferred_limit', value: '1' };
+
+    getFields(mockStages, mockRadioResidency)(store.dispatch);
+
+    expect(store.dispatch).toHaveBeenCalledWith(
+      fieldErrorAction.removeMandatoryFields(['credit_limit_consent_info_8'])
+    );
+    expect(store.dispatch).toHaveBeenCalledWith(
+      stagesAction.removeAddToggleField({
+        removeFields: ['credit_limit_consent_info_8'],
+        newFields: ['preferred_credit_limit', 'credit_limit_consent_info_5'],
+        value: '',
+      })
+    );
+  });
+
+  it('should handle empty inputs and return null', () => {
+    const result = getFields([], null)(store.dispatch);
+    expect(result).toBeNull();
+  });
+});
