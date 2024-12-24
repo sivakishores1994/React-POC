@@ -1,56 +1,145 @@
-import { AppDispatch } from "../../../services/common-service";
-import { FindIndex,getUrl } from "../../../utils/common/change.utils";
-import { KeyWithAnyModel, StageDetails } from "../../../utils/model/common-model";
-import { fieldErrorAction } from "../../../utils/store/field-error-slice";
+import { getFields } from "./getFields"; // Adjust the import path as needed
 import { stagesAction } from "../../../utils/store/stages-slice";
+import { fieldErrorAction } from "../../../utils/store/field-error-slice";
+import { getUrl } from "../../../utils/common/change.utils";
 
-export const getFields = (getStages: Array<StageDetails>, selectedOption: string, fieldName: string): any => {
-    return (dispatch: AppDispatch) => {
-        
-        let fields: Array<KeyWithAnyModel> | undefined;
+jest.mock("../../../utils/store/stages-slice", () => ({
+  stagesAction: {
+    resetDefaultValue: jest.fn(),
+    removeAddToggleField: jest.fn(),
+  },
+}));
 
-        if (getStages && getStages[0].stageInfo && getStages[0].stageInfo.fieldMetaData && getStages[0].stageInfo.fieldMetaData.data.stages) {
-            const stageId = getStages[0].stageId === 'ssf-1' ? 'ssf-2' : getStages[0].stageId;
-            const stageIndex = FindIndex(getStages[0].stageInfo, stageId);
-            fields = getStages[0].stageInfo.fieldMetaData.data.stages[stageIndex].fields;
-        }
-        if (fieldName === 'credit_into') {
-            let ssfStages: Array<string> | null = null;
-            let showFields: Array<string> = [];
-            let removeFields: Array<string> = [];
-            const userSelection = {
-                logical_field_name: fieldName,
-                selectedOption: selectedOption
-            };
-            dispatch(stagesAction.resetDefaultValue(userSelection));
-            if (selectedOption === 'Other Bank Account') {
-                showFields = ['other_bank_name', 'other_bank_account_bt', 'reenter_other_bank_account_bt'];
-            } else {
-                removeFields = ['other_bank_name', 'other_bank_account_bt', 'reenter_other_bank_account_bt'];
-            }
-            ssfStages = showFields;
-            dispatch(fieldErrorAction.removeMandatoryFields([...removeFields, ""]));
-            const valObj: any = {
-                'other_bank_name_a_1': '',
-                'other_bank_account_bt_a_1': '',
-                'reenter_other_bank_account_bt_a_1': ''
-            }
-            for (let key in valObj) {
-                valObj[key] = getUrl.getUserInputs()[key] || '';
-            }
-              dispatch(
-                stagesAction.removeAddToggleField({
-                    removeFields: removeFields,
-                    newFields: ssfStages,
-                    value: valObj
-                })
-             );
-            if (ssfStages && fields) {
-                dispatch(fieldErrorAction.getMandatoryFields(ssfStages));
-                return fields.filter((field: KeyWithAnyModel) =>
-                    ssfStages!.includes(field.logical_field_name)
-                );
-            }
-        }
-    }
-}
+jest.mock("../../../utils/store/field-error-slice", () => ({
+  fieldErrorAction: {
+    removeMandatoryFields: jest.fn(),
+    getMandatoryFields: jest.fn(),
+  },
+}));
+
+jest.mock("../../../utils/common/change.utils", () => ({
+  getUrl: {
+    getUserInputs: jest.fn(() => ({})),
+  },
+  FindIndex: jest.fn(() => 0),
+}));
+
+describe("getFields", () => {
+  let dispatch;
+  let getStages;
+  let selectedOption;
+  let fieldName;
+
+  beforeEach(() => {
+    dispatch = jest.fn();
+    getStages = [
+      {
+        stageId: "ssf-1",
+        stageInfo: {
+          fieldMetaData: {
+            data: {
+              stages: [
+                {
+                  fields: [
+                    { logical_field_name: "other_bank_name" },
+                    { logical_field_name: "other_bank_account_bt" },
+                    { logical_field_name: "reenter_other_bank_account_bt" },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
+    ];
+    selectedOption = "Other Bank Account";
+    fieldName = "credit_into";
+  });
+
+  it("dispatches resetDefaultValue with correct arguments", () => {
+    getFields(getStages, selectedOption, fieldName)(dispatch);
+
+    expect(stagesAction.resetDefaultValue).toHaveBeenCalledWith({
+      logical_field_name: fieldName,
+      selectedOption,
+    });
+  });
+
+  it("dispatches removeMandatoryFields with correct fields when selectedOption is 'Other Bank Account'", () => {
+    getFields(getStages, selectedOption, fieldName)(dispatch);
+
+    expect(fieldErrorAction.removeMandatoryFields).toHaveBeenCalledWith([
+      "",
+    ]);
+  });
+
+  it("dispatches removeAddToggleField with correct arguments", () => {
+    getUrl.getUserInputs.mockReturnValue({
+      other_bank_name_a_1: "Test Bank",
+      other_bank_account_bt_a_1: "123456",
+      reenter_other_bank_account_bt_a_1: "123456",
+    });
+
+    getFields(getStages, selectedOption, fieldName)(dispatch);
+
+    expect(stagesAction.removeAddToggleField).toHaveBeenCalledWith({
+      removeFields: [],
+      newFields: [
+        "other_bank_name",
+        "other_bank_account_bt",
+        "reenter_other_bank_account_bt",
+      ],
+      value: {
+        other_bank_name_a_1: "Test Bank",
+        other_bank_account_bt_a_1: "123456",
+        reenter_other_bank_account_bt_a_1: "123456",
+      },
+    });
+  });
+
+  it("dispatches getMandatoryFields with correct arguments", () => {
+    getFields(getStages, selectedOption, fieldName)(dispatch);
+
+    expect(fieldErrorAction.getMandatoryFields).toHaveBeenCalledWith([
+      "other_bank_name",
+      "other_bank_account_bt",
+      "reenter_other_bank_account_bt",
+    ]);
+  });
+
+  it("returns filtered fields based on ssfStages", () => {
+    const result = getFields(getStages, selectedOption, fieldName)(dispatch);
+
+    expect(result).toEqual([
+      { logical_field_name: "other_bank_name" },
+      { logical_field_name: "other_bank_account_bt" },
+      { logical_field_name: "reenter_other_bank_account_bt" },
+    ]);
+  });
+
+  it("handles case when selectedOption is not 'Other Bank Account'", () => {
+    selectedOption = "Own Bank Account";
+
+    getFields(getStages, selectedOption, fieldName)(dispatch);
+
+    expect(fieldErrorAction.removeMandatoryFields).toHaveBeenCalledWith([
+      "other_bank_name",
+      "other_bank_account_bt",
+      "reenter_other_bank_account_bt",
+      "",
+    ]);
+    expect(stagesAction.removeAddToggleField).toHaveBeenCalledWith({
+      removeFields: [
+        "other_bank_name",
+        "other_bank_account_bt",
+        "reenter_other_bank_account_bt",
+      ],
+      newFields: [],
+      value: {
+        other_bank_name_a_1: "",
+        other_bank_account_bt_a_1: "",
+        reenter_other_bank_account_bt_a_1: "",
+      },
+    });
+  });
+});
