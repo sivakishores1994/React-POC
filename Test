@@ -1,158 +1,56 @@
-import { getFields } from './path-to-get-fields';
-import { fieldErrorAction } from '../../../utils/store/field-error-slice';
-import { stagesAction } from '../../../utils/store/stages-slice';
-import configureStore from 'redux-mock-store';
-import thunk from 'redux-thunk';
+import { AppDispatch } from "../../../services/common-service";
+import { FindIndex,getUrl } from "../../../utils/common/change.utils";
+import { KeyWithAnyModel, StageDetails } from "../../../utils/model/common-model";
+import { fieldErrorAction } from "../../../utils/store/field-error-slice";
+import { stagesAction } from "../../../utils/store/stages-slice";
 
-const mockStore = configureStore([thunk]);
+export const getFields = (getStages: Array<StageDetails>, selectedOption: string, fieldName: string): any => {
+    return (dispatch: AppDispatch) => {
+        
+        let fields: Array<KeyWithAnyModel> | undefined;
 
-describe('getFields', () => {
-  let store: any;
-
-  beforeEach(() => {
-    store = mockStore({});
-    store.dispatch = jest.fn(); // Mock dispatch
-  });
-
-  it('should return fields for a valid stage and dispatch removeMandatoryFields actions', () => {
-    const mockStages = [
-      {
-        stageId: 'ad-2',
-        stageInfo: {
-          fieldmetadata: {
-            data: {
-              stages: [
-                {
-                  stageId: 'ad',
-                  fields: [{ logical_field_name: 'NRIC' }],
-                },
-              ],
-            },
-          },
-          applicants: { NRIC_a_1: 'S1234567A' },
-        },
-      },
-    ];
-
-    const mockRadioResidency = { logical_field_name: 'residency_status', value: 'CT' };
-
-    const result = getFields(mockStages, mockRadioResidency)(store.dispatch);
-
-    expect(result).toEqual([{ logical_field_name: 'NRIC' }]);
-    expect(store.dispatch).toHaveBeenCalledWith(fieldErrorAction.removeMandatoryFields(['passport_no']));
-    expect(store.dispatch).toHaveBeenCalledWith(
-      stagesAction.removeAddToggleField({
-        removeFields: ['passport_no'],
-        newFields: ['NRIC'],
-        value: 'S1234567A',
-      })
-    );
-  });
-
-  it('should return null if no matching fields are found', () => {
-    const mockStages = [
-      {
-        stageId: 'non-existent',
-        stageInfo: {
-          fieldmetadata: {
-            data: {
-              stages: [],
-            },
-          },
-        },
-      },
-    ];
-
-    const result = getFields(mockStages, null)(store.dispatch);
-
-    expect(result).toBeNull();
-  });
-
-  it('should handle work_type logic and dispatch actions correctly', () => {
-    const mockStages = [
-      {
-        stageId: 'bd-1',
-        stageInfo: {
-          fieldmetadata: {
-            data: {
-              stages: [
-                {
-                  stageId: 'bd',
-                  fields: [
-                    { logical_field_name: 'name_of_employer' },
-                    { logical_field_name: 'job_title' },
-                  ],
-                },
-              ],
-            },
-          },
-        },
-      },
-    ];
-
-    const mockRadioResidency = { logical_field_name: 'work_type', value: 'S' };
-
-    getFields(mockStages, mockRadioResidency)(store.dispatch);
-
-    expect(store.dispatch).toHaveBeenCalledWith(stagesAction.resetDefaultValue({ logical_field_name: 'work_type', value: 'S' }));
-    expect(store.dispatch).toHaveBeenCalledWith(stagesAction.resetNewAndOldFields());
-    expect(store.dispatch).toHaveBeenCalledWith(
-      fieldErrorAction.removeMandatoryFields(['name_of_business', 'nature_of_employer', 'job_title', 'office_phone_number'])
-    );
-    expect(store.dispatch).toHaveBeenCalledWith(
-      stagesAction.removeAddToggleField({
-        removeFields: ['name_of_business', 'nature_of_employer', 'job_title', 'office_phone_number'],
-        newFields: ['name_of_employer', 'nature_of_employer', 'job_title', 'office_phone_number'],
-        value: {
-          nature_of_employer_a_1: '',
-          job_title_a_1: '',
-          name_of_employer_a_1: '',
-          office_phone_number_a_1: '',
-        },
-      })
-    );
-  });
-
-  it('should handle preferred_limit logic and dispatch correct actions', () => {
-    const mockStages = [
-      {
-        stageId: 'bd-1',
-        stageInfo: {
-          fieldmetadata: {
-            data: {
-              stages: [
-                {
-                  stageId: 'bd',
-                  fields: [
-                    { logical_field_name: 'preferred_credit_limit' },
-                    { logical_field_name: 'credit_limit_consent_info_5' },
-                  ],
-                },
-              ],
-            },
-          },
-        },
-      },
-    ];
-
-    const mockRadioResidency = { logical_field_name: 'preferred_limit', value: '1' };
-
-    getFields(mockStages, mockRadioResidency)(store.dispatch);
-
-    expect(store.dispatch).toHaveBeenCalledWith(
-      fieldErrorAction.removeMandatoryFields(['credit_limit_consent_info_8'])
-    );
-    expect(store.dispatch).toHaveBeenCalledWith(
-      stagesAction.removeAddToggleField({
-        removeFields: ['credit_limit_consent_info_8'],
-        newFields: ['preferred_credit_limit', 'credit_limit_consent_info_5'],
-        value: '',
-      })
-    );
-  });
-
-  it('should handle empty inputs and return null', () => {
-    const result = getFields([], null)(store.dispatch);
-    expect(result).toBeNull();
-  });
-});
+        if (getStages && getStages[0].stageInfo && getStages[0].stageInfo.fieldMetaData && getStages[0].stageInfo.fieldMetaData.data.stages) {
+            const stageId = getStages[0].stageId === 'ssf-1' ? 'ssf-2' : getStages[0].stageId;
+            const stageIndex = FindIndex(getStages[0].stageInfo, stageId);
+            fields = getStages[0].stageInfo.fieldMetaData.data.stages[stageIndex].fields;
+        }
+        if (fieldName === 'credit_into') {
+            let ssfStages: Array<string> | null = null;
+            let showFields: Array<string> = [];
+            let removeFields: Array<string> = [];
+            const userSelection = {
+                logical_field_name: fieldName,
+                selectedOption: selectedOption
+            };
+            dispatch(stagesAction.resetDefaultValue(userSelection));
+            if (selectedOption === 'Other Bank Account') {
+                showFields = ['other_bank_name', 'other_bank_account_bt', 'reenter_other_bank_account_bt'];
+            } else {
+                removeFields = ['other_bank_name', 'other_bank_account_bt', 'reenter_other_bank_account_bt'];
+            }
+            ssfStages = showFields;
+            dispatch(fieldErrorAction.removeMandatoryFields([...removeFields, ""]));
+            const valObj: any = {
+                'other_bank_name_a_1': '',
+                'other_bank_account_bt_a_1': '',
+                'reenter_other_bank_account_bt_a_1': ''
+            }
+            for (let key in valObj) {
+                valObj[key] = getUrl.getUserInputs()[key] || '';
+            }
+              dispatch(
+                stagesAction.removeAddToggleField({
+                    removeFields: removeFields,
+                    newFields: ssfStages,
+                    value: valObj
+                })
+             );
+            if (ssfStages && fields) {
+                dispatch(fieldErrorAction.getMandatoryFields(ssfStages));
+                return fields.filter((field: KeyWithAnyModel) =>
+                    ssfStages!.includes(field.logical_field_name)
+                );
+            }
+        }
+    }
+}
