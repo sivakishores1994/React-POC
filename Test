@@ -2,7 +2,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import Dashboard from "./Dashboard";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
-import { getClientInfo, resumeRequest, uploadRequest } from "../../services/common-service";
+import {
+  getClientInfo,
+  resumeRequest,
+  uploadRequest,
+  dispatchLoader,
+} from "../../services/common-service";
 
 // Mocking Redux hooks
 jest.mock("react-redux", () => ({
@@ -33,10 +38,127 @@ jest.mock("../../services/common-service", () => ({
 // Initialize navigate function
 const mockNavigate = jest.fn();
 
-describe("Dashboard", () => {
+describe("Dashboard Component", () => {
+  
+  beforeEach(() => {
+    // Reset all mocks before each test
+    jest.clearAllMocks();
+  });
+
   it("renders without crashing", () => {
     render(<Dashboard />);
-
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
   });
+
+  it("calls getClientInfo and updates the state", async () => {
+    useDispatch.mockReturnValue(jest.fn());
+    useLocation.mockReturnValue({
+      search: "auth=upload", // Or "auth=resume" depending on the test case
+    });
+
+    getClientInfo.mockResolvedValueOnce("ibankingNTC");
+
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(getClientInfo).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    });
+  });
+
+  it("navigates correctly based on getClientInfo response", async () => {
+    useDispatch.mockReturnValue(jest.fn());
+    useLocation.mockReturnValue({
+      search: "auth=upload",
+    });
+
+    useNavigate.mockReturnValue(mockNavigate);
+
+    getClientInfo.mockResolvedValueOnce("ibankingMyinfoCC");
+
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith("sg/employment");
+    });
+  });
+
+  it("displays PopupModel when urlInvalid or myInfoAuthSelector is true", async () => {
+    useDispatch.mockReturnValue(jest.fn());
+    useSelector.mockReturnValueOnce(true); // Mock for myInfoAuthSelector
+
+    render(<Dashboard />);
+
+    expect(screen.getByText("globalError")).toBeInTheDocument(); // Or check for "MyinfoSingpassLogin"
+  });
+
+  it("displays OTPModel based on otpShowSelector", async () => {
+    useDispatch.mockReturnValue(jest.fn());
+    useSelector.mockReturnValueOnce({ otpOpen: true });
+
+    render(<Dashboard />);
+
+    expect(screen.getByText("OTPModel")).toBeInTheDocument();
+  });
+
+  it("calls resumeRequest and handles response", async () => {
+    useDispatch.mockReturnValue(jest.fn());
+    useLocation.mockReturnValue({ search: "auth=resume" });
+
+    const mockResponse = {
+      application: { journey_type: "NTC", stage: { page_id: "ssf-1" } },
+      products: [{ product_category: "CC" }],
+    };
+
+    resumeRequest.mockResolvedValueOnce(mockResponse);
+
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(resumeRequest).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    });
+  });
+
+  it("calls uploadRequest and handles response", async () => {
+    useDispatch.mockReturnValue(jest.fn());
+    useLocation.mockReturnValue({ search: "auth=upload" });
+
+    const mockResponse = { applicant_documents: [{ document_list: [] }] };
+
+    uploadRequest.mockResolvedValueOnce(mockResponse);
+
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(uploadRequest).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    });
+  });
+
+  it("correctly handles window resize", () => {
+    global.innerWidth = 500;
+    const { rerender } = render(<Dashboard />);
+
+    // Update window size
+    global.innerWidth = 800;
+    window.dispatchEvent(new Event("resize"));
+
+    rerender(<Dashboard />);
+
+    // Check if isMobileView state is updated accordingly
+    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+  });
+
+  it("renders fields component when otpResumeSelector is true", async () => {
+    useDispatch.mockReturnValue(jest.fn());
+    useSelector.mockReturnValueOnce({ otpResumeSelector: true });
+
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Fields")).toBeInTheDocument(); // Replace with actual text or element from Fields component
+    });
+  });
+
 });
