@@ -1,80 +1,62 @@
-import { initiateRTOBJourney } from './path-to-file';
-import { authenticateType } from './authenticateType';
-import { authorize } from './authorize';
-import { dispatchAuth } from './dispatchAuth';
-import { dispatchLoader } from './dispatchLoader';
-import { dispatchError } from './dispatchError';
-import { formConfig } from './formConfig';
-import { AppDispatch } from './types'; // Update the import path if needed
-import { AxiosError } from 'axios';
+export const authorize = (flowType: string): any => {
+  let url = '';
+  if (flowType === 'myinfo') {
+    url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${submitService.generateUUID}${process.env.REACT_APP_RTOB_MYINFO_AUTHORIZE}`;
+    
+  } else if (flowType === 'manual') {
+    url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${submitService.generateUUID}${process.env.REACT_APP_RTOB_MANUAL_AUTHORIZE}`;
+  }
+  const product = filterProducDetails();
+  let referParam : string | null | undefined ;
+  let referIdParam : string | null | undefined;
+      if (getUrl.getParameterByName("refer") === "true") {
+        referParam = getUrl.getParameterByName("refer");
+      }
+      if (getUrl.getParameterByName("referId")) {
+        referIdParam = getUrl.getParameterByName("referId");
+      }
+     
+  let application : any = {};
 
-jest.mock('./authenticateType');
-jest.mock('./authorize');
-jest.mock('./dispatchAuth');
-jest.mock('./dispatchLoader');
-jest.mock('./dispatchError');
-jest.mock('./formConfig');
-
-describe('initiateRTOBJourney', () => {
-  const dispatch = jest.fn();
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    sessionStorage.clear();
-    localStorage.clear();
-  });
-
-  it('should handle "myinfo" flow and dispatch appropriate actions', async () => {
-    (authenticateType as jest.Mock).mockReturnValue('myinfo');
-    const mockToken = { channelRefNo: '12345' };
-    (authorize as jest.Mock).mockResolvedValue(mockToken);
-
-    await initiateRTOBJourney()(dispatch);
-
-    // Check actions and storage behavior
-    expect(authenticateType).toHaveBeenCalled();
-    expect(dispatch).toHaveBeenCalledWith(authorize('myinfo'));
-    expect(localStorage.setItem).toHaveBeenCalledWith('chRefNo', JSON.stringify(mockToken.channelRefNo));
-    expect(dispatch).toHaveBeenCalledWith(dispatchAuth(true));
-    expect(dispatch).toHaveBeenCalledWith(dispatchLoader(false));
-    expect(sessionStorage.setItem).toHaveBeenCalledWith('token', JSON.stringify(mockToken.channelRefNo));
-  });
-
-  it('should handle "manual" flow and resolve formConfig successfully', async () => {
-    (authenticateType as jest.Mock).mockReturnValue('manual');
-    const mockResponse = { success: true };
-    (formConfig as jest.Mock).mockResolvedValue(mockResponse);
-
-    const result = await initiateRTOBJourney()(dispatch);
-
-    expect(authenticateType).toHaveBeenCalled();
-    expect(dispatch).toHaveBeenCalledWith(formConfig('manual'));
-    expect(result).toEqual(mockResponse);
-  });
-
-  it('should handle "manual" flow and dispatch error on failure', async () => {
-    (authenticateType as jest.Mock).mockReturnValue('manual');
-    const mockError = new Error('FormConfig Error') as AxiosError;
-    (formConfig as jest.Mock).mockRejectedValue(mockError);
-
-    await initiateRTOBJourney()(dispatch);
-
-    expect(authenticateType).toHaveBeenCalled();
-    expect(dispatch).toHaveBeenCalledWith(formConfig('manual'));
-    expect(dispatch).toHaveBeenCalledWith(dispatchError(mockError));
-  });
-
-  it('should handle authorize failure and not update sessionStorage or localStorage', async () => {
-    (authenticateType as jest.Mock).mockReturnValue('myinfo');
-    const mockError = new Error('Authorization Error');
-    (authorize as jest.Mock).mockRejectedValue(mockError);
-
-    await initiateRTOBJourney()(dispatch);
-
-    expect(authenticateType).toHaveBeenCalled();
-    expect(dispatch).toHaveBeenCalledWith(authorize('myinfo'));
-    expect(localStorage.setItem).not.toHaveBeenCalled();
-    expect(sessionStorage.setItem).not.toHaveBeenCalled();
-    expect(dispatch).toHaveBeenCalledWith(dispatchError(mockError));
-  });
-});
+  if(referParam === "true" ){
+    application.refer = referParam ;
+  }
+  if(referIdParam){
+    application.referId = referIdParam ;
+  }
+  let payload: any = [];
+  payload = {
+    products: sortByAscendingOrder(product),
+    myinfo: {
+    	redirectUri: `${process.env.REACT_APP_SINGPASS_CALLBACK}`
+    }
+  };
+  if(application.refer || application.referId){
+    payload.application = application ;
+  }
+  return async (dispatch: AppDispatch) => {
+    if(getUrl.getAggregatorStatus()){
+      const referapplication = payload.application;
+      payload.application = await setAggregator()
+      if(referapplication && (referapplication.refer || referapplication.referId)){
+        payload.application = {...payload.application,...referapplication}
+      }
+      dispatch(urlParamAction.aggregatorsDetails(payload.application));
+    }
+    
+    return axios
+      .post(url, payload)
+      .then((response) => {
+        if (response.status === 200) {
+          dispatch(authorizeAction.getAuthorize(response.data));
+          return Promise.resolve(response.data);
+        } else {
+          defaultError();
+        }
+      })
+      .catch((error) => {
+        dispatch(dispatchError(error));
+        return Promise.reject(error);
+      });
+  };
+};
