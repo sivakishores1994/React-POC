@@ -1,44 +1,28 @@
-export const getProductInfo = (
-  products: string,
-  productInfoResponse: Array<ProductModel>
-) => {
+export const getProductMetaData = (product_type:string | null): any => {
+  const url = `${process.env.REACT_APP_PRODUCT_INFO_URL}`;
   return async (dispatch: AppDispatch) => {
-    let filteredProducts = [];
-    let selectedProducts: Array<string>;
-    const campaign = getUrl.getParameterByName("campaign") || null;
-    const intcid = getUrl.getParameterByName("intcid") || null;
-    if(intcid){
-      localStorage.setItem("intcid",intcid);
-    }
-    if (products) {
-      selectedProducts =
-        products.indexOf(",") > 0 ? products.split(",") : [products];
-      for (let i = 0; i < selectedProducts.length; i++) {
-        filteredProducts.push(
-          // eslint-disable-next-line array-callback-return
-          productInfoResponse.filter((product: ProductModel) => {
-            if (product.product_type === selectedProducts[i]) {
-              if (campaign) {
-                product.campaign = campaign;
-              }
+    return axios
+      .get(url)
+      .then(async (response) => {
+        let productInfoResponse = response.data.products;
+        let products = product_type ? product_type : getUrl.getParameterByName("products");
 
-              return product;
-            }
-          })
-        );
-      }
-      const flatFilteredArray = filteredProducts.flat();
-      if (flatFilteredArray && flatFilteredArray.length > 0) {
-        dispatch(urlParamAction.productDetails(flatFilteredArray));
-      } else {
-        const error = {
-          response: {
-            status: "error",
-            statusText: "no response",
-          },
-        };
+        if (products) {
+          dispatch(getProductInfo(products, productInfoResponse));
+          return Promise.resolve();
+        } else {
+          const error = {
+            response: {
+              status: "error",
+              statusText: "no response",
+            },
+          };
+          dispatch(dispatchError(error));
+          return Promise.reject();
+        }
+      })
+      .catch((error: AxiosError) => {
         dispatch(dispatchError(error));
-      }
-    }
+      });
   };
 };
