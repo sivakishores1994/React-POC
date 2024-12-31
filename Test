@@ -1,98 +1,55 @@
-export const initiateRTOBJourney = (): any => {
+export const getBancaEligibleProducts = (data : any): any => {
+  let productType = data.stageInfo ? data.stageInfo.products[0].product_type : data.products[0].product_type;
+  let productCategory = data.stageInfo ? data.stageInfo.products[0].product_category : data.products[0].product_category;
+  let dateOfBirth = data.stageInfo ? data.stageInfo.applicants['date_of_birth_a_1'] : data.applicants['date_of_birth_a_1'];
+  let applicantAge = validateService.calculateAge(dateOfBirth);
+  let bancaData: any;
+  let eligibleBancaInsurances : any = [];
+  let eligibleBancaInsuranceInformations : any = [];
+  const bancaProductsMappingUrl = `${process.env.REACT_APP_BANCA_PRODUCTS_MAPPING_URL}`;
   return async (dispatch: AppDispatch) => {
-    const flowType = authenticateType() 
-    if (flowType === "myinfo") {
-      console.log(dispatch(authorize(flowType)));
-      await dispatch(authorize(flowType)).then(async (token: any) => {
-       if (sessionStorage.getItem("token")) {
-          sessionStorage.removeItem("token");
-        }
-        localStorage.setItem(
-          "chRefNo",
-          JSON.stringify(token["channelRefNo"])
-        );
-        if (!sessionStorage.getItem("token")) {
-          dispatch(dispatchAuth(true));
-          sessionStorage.setItem(
-            "token",
-            JSON.stringify(token["channelRefNo"])
-          );
-          dispatch(dispatchLoader(false));
-        } else {
-          dispatch(dispatchAuth(false));
-        }
-      });
-    } else {
-      return dispatch(formConfig("manual"))
+      return await fetch(bancaProductsMappingUrl)
         .then((response: any) => {
-          return Promise.resolve(response);
+            return response.json();
         })
-        .catch((error: AxiosError) => {
-          dispatch(dispatchError(error));
-        });
-    }
-  };
-};
-
-export const authorize = (flowType: string): any => {
-  let url = '';
-  if (flowType === 'myinfo') {
-    url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${submitService.generateUUID}${process.env.REACT_APP_RTOB_MYINFO_AUTHORIZE}`;
-    
-  } else if (flowType === 'manual') {
-    url = `${process.env.REACT_APP_RTOB_BASE_URL}${process.env.REACT_APP_RTOB_APPLICATION_END_POINT}${submitService.generateUUID}${process.env.REACT_APP_RTOB_MANUAL_AUTHORIZE}`;
+        .then(async (productsMappingData: any) => {
+                const bancaEligibleProducts = productsMappingData;
+                const bancaProductDetailsUrl = `${process.env.REACT_APP_BANCA_PRODUCT_DETAILS_URL}`;
+                return await fetch(bancaProductDetailsUrl)
+                .then((response: any) => {
+                    return response.json();
+                })
+                .then((productDetailsData: any) => {
+                      const bancaProductDetailsInformations = productDetailsData;
+                      bancaEligibleProducts.forEach((bancaEligibleProduct: KeyWithAnyModel) => {
+                        if(bancaEligibleProduct["ProductCode"] === productType && bancaEligibleProduct["ProductCategory"] === productCategory)
+                        {
+                          let ageValues = bancaEligibleProduct['InsuranceProductAgeLimit'].split(',');
+                          let maxAge = Math.max(...ageValues);
+                          let minAge = Math.min(...ageValues);
+                          if (applicantAge >= minAge && applicantAge <= maxAge) {
+                            eligibleBancaInsurances.push(bancaEligibleProduct["InsuranceProductDetailCode"]);
+                            bancaProductDetailsInformations.forEach((bancaProductDetailsInformation: KeyWithAnyModel) => {
+                                if(bancaProductDetailsInformation["ProductDetailCode"] === bancaEligibleProduct["InsuranceProductDetailCode"])
+                                {
+                                  eligibleBancaInsuranceInformations.push(bancaProductDetailsInformation);
+                                }
+                            });
+                            bancaData = {
+                              eligible_banca_insurances: eligibleBancaInsurances,
+                              eligible_banca_insurance_informations: eligibleBancaInsuranceInformations,
+                              banca_product_applicable_a_1: 'Y'
+                            } 
+                          }
+                          else {
+                            bancaData = {
+                              banca_product_applicable_a_1: 'N'
+                            } 
+                          }
+                        }
+                      });
+                      dispatch(bancaListAction.getBancaData(bancaData));
+                })
+        })
   }
-  const product = filterProducDetails();
-  let referParam : string | null | undefined ;
-  let referIdParam : string | null | undefined;
-      if (getUrl.getParameterByName("refer") === "true") {
-        referParam = getUrl.getParameterByName("refer");
-      }
-      if (getUrl.getParameterByName("referId")) {
-        referIdParam = getUrl.getParameterByName("referId");
-      }
-     
-  let application : any = {};
-
-  if(referParam === "true" ){
-    application.refer = referParam ;
-  }
-  if(referIdParam){
-    application.referId = referIdParam ;
-  }
-  let payload: any = [];
-  payload = {
-    products: sortByAscendingOrder(product),
-    myinfo: {
-    	redirectUri: `${process.env.REACT_APP_SINGPASS_CALLBACK}`
-    }
-  };
-  if(application.refer || application.referId){
-    payload.application = application ;
-  }
-  return async (dispatch: AppDispatch) => {
-    if(getUrl.getAggregatorStatus()){
-      const referapplication = payload.application;
-      payload.application = await setAggregator()
-      if(referapplication && (referapplication.refer || referapplication.referId)){
-        payload.application = {...payload.application,...referapplication}
-      }
-      dispatch(urlParamAction.aggregatorsDetails(payload.application));
-    }
-    
-    return axios
-      .post(url, payload)
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch(authorizeAction.getAuthorize(response.data));
-          return Promise.resolve(response.data);
-        } else {
-          defaultError();
-        }
-      })
-      .catch((error) => {
-        dispatch(dispatchError(error));
-        return Promise.reject(error);
-      });
-  };
 };
