@@ -1,26 +1,109 @@
-export const resumeRequest = (appRef : string | null): any => {
-  const baseUrl = `${process.env.REACT_APP_RTOB_BASE_URL}`;
-  const endPoint = appRef + `${process.env.REACT_APP_RTOB_RESUME_END_POINT}`;
-  const url = `${
-    baseUrl +
-    process.env.REACT_APP_RTOB_APPLICATION_END_POINT +
-    endPoint
-  }`;
- 
-  return async (dispatch: AppDispatch) => {
-    return dispatch(exceptionCheck(await axios.get(url)))
-      .then((response: any) => {
-        if(response !== "Rejected"){
-        if (response.data && response.data.applicants && response.data.application) {  
-          dispatch(urlParamAction.getAuthorize({ channelRefNo: response.data.application.channel_reference }));  
-          return Promise.resolve(response.data);
-        } else {
-          defaultError();
-        }
-      }
-      })
-      .catch((err: any) => {
-        if(err !== "Rejected"){return Promise.reject(err)}else{dispatch(dispatchLoader(false));}
-      });
+import { resumeRequest } from './common-service'; // Update the path to your file
+import * as urlParamAction from './urlParamAction'; // Mock urlParamAction
+import axios from 'axios';
+import { defaultError } from './error-service'; // Mock defaultError
+
+jest.mock('axios');
+jest.mock('./urlParamAction', () => ({
+  getAuthorize: jest.fn(),
+}));
+jest.mock('./error-service', () => ({
+  defaultError: jest.fn(),
+}));
+
+describe('resumeRequest', () => {
+  const mockDispatch = jest.fn();
+  const mockResponse = {
+    data: {
+      applicants: { name: 'John Doe' },
+      application: { channel_reference: '12345' },
+    },
   };
-};
+
+  const mockRejectedResponse = new Error('Network error');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.REACT_APP_RTOB_BASE_URL = 'https://mock-api.com';
+    process.env.REACT_APP_RTOB_RESUME_END_POINT = '/resume';
+    process.env.REACT_APP_RTOB_APPLICATION_END_POINT = '/application';
+  });
+
+  it('should dispatch the correct actions on successful API call', async () => {
+    const appRef = 'APP123';
+    const expectedUrl = 'https://mock-api.com/application/APP123/resume';
+
+    (axios.get as jest.Mock).mockResolvedValueOnce(mockResponse);
+
+    await resumeRequest(appRef)(mockDispatch);
+
+    // Verify axios call
+    expect(axios.get).toHaveBeenCalledWith(expectedUrl);
+
+    // Verify dispatch calls
+    expect(urlParamAction.getAuthorize).toHaveBeenCalledWith({
+      channelRefNo: '12345',
+    });
+    expect(mockDispatch).toHaveBeenCalledWith(
+      urlParamAction.getAuthorize({ channelRefNo: '12345' })
+    );
+  });
+
+  it('should handle API call rejection gracefully', async () => {
+    const appRef = 'APP123';
+
+    (axios.get as jest.Mock).mockRejectedValueOnce(mockRejectedResponse);
+
+    await expect(resumeRequest(appRef)(mockDispatch)).rejects.toThrow(
+      'Network error'
+    );
+
+    // Verify no dispatch calls
+    expect(mockDispatch).not.toHaveBeenCalledWith(
+      urlParamAction.getAuthorize(expect.anything())
+    );
+  });
+
+  it('should call defaultError if response data is invalid', async () => {
+    const appRef = 'APP123';
+    const mockInvalidResponse = { data: null };
+
+    (axios.get as jest.Mock).mockResolvedValueOnce(mockInvalidResponse);
+
+    await resumeRequest(appRef)(mockDispatch);
+
+    // Verify defaultError is called
+    expect(defaultError).toHaveBeenCalled();
+
+    // Verify no dispatch calls with valid data
+    expect(mockDispatch).not.toHaveBeenCalledWith(
+      urlParamAction.getAuthorize(expect.anything())
+    );
+  });
+
+  it('should handle "Rejected" responses correctly', async () => {
+    const appRef = 'APP123';
+    const rejectedResponse = 'Rejected';
+
+    mockDispatch.mockReturnValueOnce(Promise.resolve(rejectedResponse));
+
+    await resumeRequest(appRef)(mockDispatch);
+
+    // Verify no further actions are dispatched
+    expect(mockDispatch).toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalledWith(
+      urlParamAction.getAuthorize(expect.anything())
+    );
+  });
+
+  it('should dispatch loader off if error is "Rejected"', async () => {
+    const appRef = 'APP123';
+
+    (axios.get as jest.Mock).mockRejectedValueOnce('Rejected');
+
+    await resumeRequest(appRef)(mockDispatch);
+
+    // Verify dispatchLoader is called
+    expect(mockDispatch).toHaveBeenCalledWith(false);
+  });
+});
