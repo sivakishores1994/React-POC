@@ -1,55 +1,126 @@
-export const getBancaEligibleProducts = (data : any): any => {
-  let productType = data.stageInfo ? data.stageInfo.products[0].product_type : data.products[0].product_type;
-  let productCategory = data.stageInfo ? data.stageInfo.products[0].product_category : data.products[0].product_category;
-  let dateOfBirth = data.stageInfo ? data.stageInfo.applicants['date_of_birth_a_1'] : data.applicants['date_of_birth_a_1'];
-  let applicantAge = validateService.calculateAge(dateOfBirth);
-  let bancaData: any;
-  let eligibleBancaInsurances : any = [];
-  let eligibleBancaInsuranceInformations : any = [];
-  const bancaProductsMappingUrl = `${process.env.REACT_APP_BANCA_PRODUCTS_MAPPING_URL}`;
-  return async (dispatch: AppDispatch) => {
-      return await fetch(bancaProductsMappingUrl)
-        .then((response: any) => {
-            return response.json();
-        })
-        .then(async (productsMappingData: any) => {
-                const bancaEligibleProducts = productsMappingData;
-                const bancaProductDetailsUrl = `${process.env.REACT_APP_BANCA_PRODUCT_DETAILS_URL}`;
-                return await fetch(bancaProductDetailsUrl)
-                .then((response: any) => {
-                    return response.json();
-                })
-                .then((productDetailsData: any) => {
-                      const bancaProductDetailsInformations = productDetailsData;
-                      bancaEligibleProducts.forEach((bancaEligibleProduct: KeyWithAnyModel) => {
-                        if(bancaEligibleProduct["ProductCode"] === productType && bancaEligibleProduct["ProductCategory"] === productCategory)
-                        {
-                          let ageValues = bancaEligibleProduct['InsuranceProductAgeLimit'].split(',');
-                          let maxAge = Math.max(...ageValues);
-                          let minAge = Math.min(...ageValues);
-                          if (applicantAge >= minAge && applicantAge <= maxAge) {
-                            eligibleBancaInsurances.push(bancaEligibleProduct["InsuranceProductDetailCode"]);
-                            bancaProductDetailsInformations.forEach((bancaProductDetailsInformation: KeyWithAnyModel) => {
-                                if(bancaProductDetailsInformation["ProductDetailCode"] === bancaEligibleProduct["InsuranceProductDetailCode"])
-                                {
-                                  eligibleBancaInsuranceInformations.push(bancaProductDetailsInformation);
-                                }
-                            });
-                            bancaData = {
-                              eligible_banca_insurances: eligibleBancaInsurances,
-                              eligible_banca_insurance_informations: eligibleBancaInsuranceInformations,
-                              banca_product_applicable_a_1: 'Y'
-                            } 
-                          }
-                          else {
-                            bancaData = {
-                              banca_product_applicable_a_1: 'N'
-                            } 
-                          }
-                        }
-                      });
-                      dispatch(bancaListAction.getBancaData(bancaData));
-                })
-        })
-  }
-};
+import { getBancaEligibleProducts } from './common-service'; // Update the path as needed
+import * as actions from './common-service'; // For spying on actions
+import * as validateService from './validate-service'; // Mock calculateAge
+import { bancaListAction } from './banca-actions'; // Mock bancaListAction
+
+jest.mock('./validate-service', () => ({
+  calculateAge: jest.fn(),
+}));
+
+jest.mock('./banca-actions', () => ({
+  bancaListAction: {
+    getBancaData: jest.fn(),
+  },
+}));
+
+describe('getBancaEligibleProducts', () => {
+  const mockDispatch = jest.fn();
+  const mockProductsMappingData = [
+    {
+      ProductCode: '123',
+      ProductCategory: 'CC',
+      InsuranceProductAgeLimit: '18,60',
+      InsuranceProductDetailCode: 'INS123',
+    },
+  ];
+  const mockProductDetailsData = [
+    {
+      ProductDetailCode: 'INS123',
+      Name: 'Insurance Plan A',
+    },
+  ];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = jest.fn();
+  });
+
+  it('should dispatch eligible products when applicant age is within range', async () => {
+    // Mock calculateAge to return an eligible age
+    (validateService.calculateAge as jest.Mock).mockReturnValue(25);
+
+    // Mock fetch responses
+    (fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        json: jest.fn().mockResolvedValue(mockProductsMappingData),
+      })
+      .mockResolvedValueOnce({
+        json: jest.fn().mockResolvedValue(mockProductDetailsData),
+      });
+
+    const mockData = {
+      stageInfo: {
+        products: [{ product_type: '123', product_category: 'CC' }],
+        applicants: { date_of_birth_a_1: '1998-01-01' },
+      },
+    };
+
+    const expectedBancaData = {
+      eligible_banca_insurances: ['INS123'],
+      eligible_banca_insurance_informations: [mockProductDetailsData[0]],
+      banca_product_applicable_a_1: 'Y',
+    };
+
+    await getBancaEligibleProducts(mockData)(mockDispatch);
+
+    // Check if fetch was called twice
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledWith(process.env.REACT_APP_BANCA_PRODUCTS_MAPPING_URL);
+    expect(fetch).toHaveBeenCalledWith(process.env.REACT_APP_BANCA_PRODUCT_DETAILS_URL);
+
+    // Verify dispatch calls
+    expect(bancaListAction.getBancaData).toHaveBeenCalledWith(expectedBancaData);
+    expect(mockDispatch).toHaveBeenCalledWith(bancaListAction.getBancaData(expectedBancaData));
+  });
+
+  it('should dispatch non-eligible products when applicant age is out of range', async () => {
+    // Mock calculateAge to return a non-eligible age
+    (validateService.calculateAge as jest.Mock).mockReturnValue(65);
+
+    // Mock fetch responses
+    (fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        json: jest.fn().mockResolvedValue(mockProductsMappingData),
+      })
+      .mockResolvedValueOnce({
+        json: jest.fn().mockResolvedValue(mockProductDetailsData),
+      });
+
+    const mockData = {
+      stageInfo: {
+        products: [{ product_type: '123', product_category: 'CC' }],
+        applicants: { date_of_birth_a_1: '1958-01-01' },
+      },
+    };
+
+    const expectedBancaData = {
+      banca_product_applicable_a_1: 'N',
+    };
+
+    await getBancaEligibleProducts(mockData)(mockDispatch);
+
+    // Check if fetch was called twice
+    expect(fetch).toHaveBeenCalledTimes(2);
+
+    // Verify dispatch calls
+    expect(bancaListAction.getBancaData).toHaveBeenCalledWith(expectedBancaData);
+    expect(mockDispatch).toHaveBeenCalledWith(bancaListAction.getBancaData(expectedBancaData));
+  });
+
+  it('should handle fetch errors gracefully', async () => {
+    // Mock fetch to throw an error
+    (fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+
+    const mockData = {
+      stageInfo: {
+        products: [{ product_type: '123', product_category: 'CC' }],
+        applicants: { date_of_birth_a_1: '1998-01-01' },
+      },
+    };
+
+    await expect(getBancaEligibleProducts(mockData)(mockDispatch)).rejects.toThrow('Network error');
+
+    // Verify no dispatch calls
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
+});
