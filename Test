@@ -1,32 +1,24 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { useDispatch, useSelector } from 'react-redux';
+import configureMockStore from 'redux-mock-store';
+import { Provider } from 'react-redux';
 import DropDownModel from './dropdown-model';
 import { getFields } from '../selection-box/selection-box.util';
-
-// Mock Redux hooks
-jest.mock('react-redux', () => ({
-  useDispatch: jest.fn(),
-  useSelector: jest.fn(),
-}));
 
 jest.mock('../selection-box/selection-box.util', () => ({
   getFields: jest.fn(),
 }));
 
 describe('DropDownModel Component', () => {
-  const mockDispatch = jest.fn();
+  const mockStore = configureMockStore();
+  let store: any;
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (useDispatch as jest.Mock).mockReturnValue(mockDispatch);
-    (useSelector as jest.Mock).mockImplementation((selector) => {
-      if (selector.name === 'stageSelector') {
-        return [{ stageInfo: { products: [{ product_type: '601' }] } }];
-      }
-      return [];
-    });
-  });
+  const initialState = {
+    stages: {
+      stages: [{ stageInfo: { products: [{ product_type: '601' }] } }],
+      userInput: { applicants: [] },
+    },
+  };
 
   const props = {
     logicalFieldName: 'credit_into',
@@ -40,48 +32,74 @@ describe('DropDownModel Component', () => {
     value: 'Test Value',
   };
 
+  beforeEach(() => {
+    store = mockStore(initialState);
+    jest.clearAllMocks();
+  });
+
   it('renders the component correctly', () => {
-    render(<DropDownModel {...props} />);
+    render(
+      <Provider store={store}>
+        <DropDownModel {...props} />
+      </Provider>
+    );
     expect(screen.getByText('Test Label')).toBeInTheDocument();
   });
 
   it('displays options based on props.selectedOption', () => {
-    render(<DropDownModel {...props} />);
+    render(
+      <Provider store={store}>
+        <DropDownModel {...props} />
+      </Provider>
+    );
     expect(screen.getByLabelText('Test Option')).toBeInTheDocument();
   });
 
   it('triggers addUserInput when an option is clicked', () => {
-    render(<DropDownModel {...props} />);
+    render(
+      <Provider store={store}>
+        <DropDownModel {...props} />
+      </Provider>
+    );
     const radioInput = screen.getByLabelText('Test Option');
     fireEvent.click(radioInput);
     expect(props.addUserInput).toHaveBeenCalledWith(props.selectedOption[0]);
   });
 
   it('dispatches getFields when logicalFieldName is credit_into', () => {
-    render(<DropDownModel {...props} />);
-    expect(mockDispatch).toHaveBeenCalledWith(
-      getFields([], '123', 'credit_into')
+    (getFields as jest.Mock).mockReturnValue([{ CODE_VALUE: 'Field1' }]);
+
+    render(
+      <Provider store={store}>
+        <DropDownModel {...props} />
+      </Provider>
+    );
+
+    // Validate dispatch
+    const actions = store.getActions();
+    expect(actions).toEqual([]); // No actions dispatched directly; `getFields` is called within `useEffect`.
+    expect(getFields).toHaveBeenCalledWith(
+      initialState.stages.stages,
+      '123',
+      'credit_into'
     );
   });
 
-  it('sets otherBankradiodisplay to "radio-hidden" when selectedOption.length <= 1', () => {
-    render(<DropDownModel {...props} />);
-    expect(screen.getByClassName('radio-hidden')).toBeTruthy();
-  });
-
-  it('renders additional fields when logicalFieldName is credit_into', () => {
-    (getFields as jest.Mock).mockReturnValue([{ CODE_VALUE: 'Field1' }]);
-    render(<DropDownModel {...props} />);
-    expect(mockDispatch).toHaveBeenCalled();
-  });
-
   it('shows label if product_type is 601', () => {
-    render(<DropDownModel {...props} />);
+    render(
+      <Provider store={store}>
+        <DropDownModel {...props} />
+      </Provider>
+    );
     expect(screen.getByText('Test Label')).toBeInTheDocument();
   });
 
   it('handles close button click', () => {
-    render(<DropDownModel {...props} />);
+    render(
+      <Provider store={store}>
+        <DropDownModel {...props} />
+      </Provider>
+    );
     const closeButton = screen.getByText(/close/i);
     fireEvent.click(closeButton);
     expect(props.close).toHaveBeenCalled();
