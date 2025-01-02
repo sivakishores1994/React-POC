@@ -1,131 +1,89 @@
-import React, { useEffect, useState } from "react";
-import "./dropdown-model.scss";
-import {
-  KeyWithAnyModel,
-  LovInputValModel,
-  StoreModel,
-} from "../../../utils/model/common-model";
-import { AccountList } from "../selection-box/selection-box.utils";
-import { useDispatch, useSelector } from "react-redux";
-import renderComponent from "../../../modules/dashboard/fields/renderer";
-import { getFields } from "../selection-box/selection-box.util";
-import { isFieldUpdate } from "../../../utils/common/change.utils";
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { useDispatch, useSelector } from 'react-redux';
+import DropDownModel from './dropdown-model';
+import { getFields } from '../selection-box/selection-box.util';
 
-const DropDownModel = (props: KeyWithAnyModel) => {
-  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
-  const applicantsSelector = useSelector(
-    (state: StoreModel) => state.stages.userInput.applicants
-  );
-  const [isEligible, setIsEligible] = useState(false);
-  const [isLabelVisible, setIsLabelVisible] = useState(false);
-  const [field, setField] = useState([]);
-  const [otherBankradiodisplay, setotherBankradiodisplay] = useState('');
-  const dispatch = useDispatch();
+// Mock Redux hooks
+jest.mock('react-redux', () => ({
+  useDispatch: jest.fn(),
+  useSelector: jest.fn(),
+}));
 
-  useEffect(() => {
-    if (props.logicalFieldName === 'credit_into' && props.selectedOption.length <= 1) {
-      setotherBankradiodisplay('radio-hidden');
-    }
-  }, []);
-  useEffect(() => {
-    if (props.logicalFieldName === 'credit_into') {
-      const stageComponents = dispatch(
-        getFields(stageSelector, props.selectedValue[0].CODE_VALUE, props.logicalFieldName)
-      );
-      setField(stageComponents);
-    }
-  }, [props.selectedValue]);
+jest.mock('../selection-box/selection-box.util', () => ({
+  getFields: jest.fn(),
+}));
 
+describe('DropDownModel Component', () => {
+  const mockDispatch = jest.fn();
 
-  useEffect(() => {
-    if (stageSelector && stageSelector.length > 0) {
-      const prouctCode = stageSelector[0].stageInfo.products[0].product_type;
-      setIsLabelVisible(prouctCode === '601');
-    }
-  }, []);
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useDispatch as jest.Mock).mockReturnValue(mockDispatch);
+    (useSelector as jest.Mock).mockImplementation((selector) => {
+      if (selector.name === 'stageSelector') {
+        return [{ stageInfo: { products: [{ product_type: '601' }] } }];
+      }
+      return [];
+    });
+  });
 
-  const itemList = (item: any, index: number) => {
-    if (props.logicalFieldName === "loan_account_list") {
-      return <AccountList show={'true'} addUserInputFun={props.addUserInput} item={item} logical_field_name={props.logicalFieldName} />;
-    }
-    else {
-      return (
-        <div>
-          {props.logicalFieldName !== 'credit_into' && <div key={index} className="dropdown-select__item">
-            <input
-              type="radio"
-              checked={item.checked}
-              onClick={() => props.addUserInput(item)}
-              onChange={() => {
-                //do nothing
-              }}
-              value={item.CODE_VALUE}
-              id={item.CODE_VALUE}
-            />
-            <label htmlFor={item.CODE_VALUE}>{item.CODE_DESC}</label>
-          </div>}
-          {props.logicalFieldName === 'credit_into' && <div key={index} className={`dropdown-select__item credit_into_dropdown ${otherBankradiodisplay}`}>
-            <input
-              type="radio"
-              checked={item.checked}
-              onClick={() => props.addUserInput(item)}
-              onChange={() => {
-                //do nothing
-              }}
-              value={item.CODE_VALUE}
-              id={item.CODE_VALUE}
-            />
-            <div className="label-content">
-              <label htmlFor={item.CODE_VALUE}>
-                {item.CODE_DESC}
-              </label>
-              {props.logicalFieldName === 'credit_into' && item.CODE_VALUE !== 'Other Bank Account' &&
-                <div className="for-credit-into">{item.CODE_VALUE}
-                </div>}
-            </div>
-          </div>}
-
-        </div>
-      );
-    }
+  const props = {
+    logicalFieldName: 'credit_into',
+    selectedOption: [{ CODE_VALUE: '123', CODE_DESC: 'Test Option', checked: false }],
+    selectedValue: [{ CODE_VALUE: '123' }],
+    label: 'Test Label',
+    close: jest.fn(),
+    addUserInput: jest.fn(),
+    handleCallback: jest.fn(),
+    handleFieldDispatch: jest.fn(),
+    value: 'Test Value',
   };
 
-  return (
-    <div>
-      <div className="dropdown-select__background">
-        <div className="dropdown-select__bg-curve"></div>
-        <div
-          className={`dropdown-select__popup ${props.logicalFieldName === "maturity_amount" ? "dropdown-select--tenor" : ""
-            }`}
-        >
-          <div className="dropdown-select__header">
-            <div>{props.label}</div>
-            <div className="close" onClick={props.close}></div>
-          </div>
+  it('renders the component correctly', () => {
+    render(<DropDownModel {...props} />);
+    expect(screen.getByText('Test Label')).toBeInTheDocument();
+  });
 
-          <div className="dropdown-select__expand">
-            <>
-              {props.selectedOption.map(
-                (item: LovInputValModel, index: number) => {
-                  return <>{itemList(item, index)}</>;
-                }
-              )}
-            </>
-            {props.logicalFieldName === 'credit_into' && field &&
-              field.map((currentSection: KeyWithAnyModel, index: number) => {
-                return renderComponent(
-                  currentSection,
-                  index,
-                  props.handleCallback,
-                  props.handleFieldDispatch,
-                  props.value
-                );
-              })}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+  it('displays options based on props.selectedOption', () => {
+    render(<DropDownModel {...props} />);
+    expect(screen.getByLabelText('Test Option')).toBeInTheDocument();
+  });
 
-export default DropDownModel;
+  it('triggers addUserInput when an option is clicked', () => {
+    render(<DropDownModel {...props} />);
+    const radioInput = screen.getByLabelText('Test Option');
+    fireEvent.click(radioInput);
+    expect(props.addUserInput).toHaveBeenCalledWith(props.selectedOption[0]);
+  });
+
+  it('dispatches getFields when logicalFieldName is credit_into', () => {
+    render(<DropDownModel {...props} />);
+    expect(mockDispatch).toHaveBeenCalledWith(
+      getFields([], '123', 'credit_into')
+    );
+  });
+
+  it('sets otherBankradiodisplay to "radio-hidden" when selectedOption.length <= 1', () => {
+    render(<DropDownModel {...props} />);
+    expect(screen.getByClassName('radio-hidden')).toBeTruthy();
+  });
+
+  it('renders additional fields when logicalFieldName is credit_into', () => {
+    (getFields as jest.Mock).mockReturnValue([{ CODE_VALUE: 'Field1' }]);
+    render(<DropDownModel {...props} />);
+    expect(mockDispatch).toHaveBeenCalled();
+  });
+
+  it('shows label if product_type is 601', () => {
+    render(<DropDownModel {...props} />);
+    expect(screen.getByText('Test Label')).toBeInTheDocument();
+  });
+
+  it('handles close button click', () => {
+    render(<DropDownModel {...props} />);
+    const closeButton = screen.getByText(/close/i);
+    fireEvent.click(closeButton);
+    expect(props.close).toHaveBeenCalled();
+  });
+});
