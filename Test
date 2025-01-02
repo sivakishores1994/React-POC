@@ -1,109 +1,131 @@
-import { resumeRequest } from './common-service'; // Update the path to your file
-import * as urlParamAction from './urlParamAction'; // Mock urlParamAction
-import axios from 'axios';
-import { defaultError } from './error-service'; // Mock defaultError
+import React, { useEffect, useState } from "react";
+import "./dropdown-model.scss";
+import {
+  KeyWithAnyModel,
+  LovInputValModel,
+  StoreModel,
+} from "../../../utils/model/common-model";
+import { AccountList } from "../selection-box/selection-box.utils";
+import { useDispatch, useSelector } from "react-redux";
+import renderComponent from "../../../modules/dashboard/fields/renderer";
+import { getFields } from "../selection-box/selection-box.util";
+import { isFieldUpdate } from "../../../utils/common/change.utils";
 
-jest.mock('axios');
-jest.mock('./urlParamAction', () => ({
-  getAuthorize: jest.fn(),
-}));
-jest.mock('./error-service', () => ({
-  defaultError: jest.fn(),
-}));
+const DropDownModel = (props: KeyWithAnyModel) => {
+  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
+  const applicantsSelector = useSelector(
+    (state: StoreModel) => state.stages.userInput.applicants
+  );
+  const [isEligible, setIsEligible] = useState(false);
+  const [isLabelVisible, setIsLabelVisible] = useState(false);
+  const [field, setField] = useState([]);
+  const [otherBankradiodisplay, setotherBankradiodisplay] = useState('');
+  const dispatch = useDispatch();
 
-describe('resumeRequest', () => {
-  const mockDispatch = jest.fn();
-  const mockResponse = {
-    data: {
-      applicants: { name: 'John Doe' },
-      application: { channel_reference: '12345' },
-    },
+  useEffect(() => {
+    if (props.logicalFieldName === 'credit_into' && props.selectedOption.length <= 1) {
+      setotherBankradiodisplay('radio-hidden');
+    }
+  }, []);
+  useEffect(() => {
+    if (props.logicalFieldName === 'credit_into') {
+      const stageComponents = dispatch(
+        getFields(stageSelector, props.selectedValue[0].CODE_VALUE, props.logicalFieldName)
+      );
+      setField(stageComponents);
+    }
+  }, [props.selectedValue]);
+
+
+  useEffect(() => {
+    if (stageSelector && stageSelector.length > 0) {
+      const prouctCode = stageSelector[0].stageInfo.products[0].product_type;
+      setIsLabelVisible(prouctCode === '601');
+    }
+  }, []);
+
+  const itemList = (item: any, index: number) => {
+    if (props.logicalFieldName === "loan_account_list") {
+      return <AccountList show={'true'} addUserInputFun={props.addUserInput} item={item} logical_field_name={props.logicalFieldName} />;
+    }
+    else {
+      return (
+        <div>
+          {props.logicalFieldName !== 'credit_into' && <div key={index} className="dropdown-select__item">
+            <input
+              type="radio"
+              checked={item.checked}
+              onClick={() => props.addUserInput(item)}
+              onChange={() => {
+                //do nothing
+              }}
+              value={item.CODE_VALUE}
+              id={item.CODE_VALUE}
+            />
+            <label htmlFor={item.CODE_VALUE}>{item.CODE_DESC}</label>
+          </div>}
+          {props.logicalFieldName === 'credit_into' && <div key={index} className={`dropdown-select__item credit_into_dropdown ${otherBankradiodisplay}`}>
+            <input
+              type="radio"
+              checked={item.checked}
+              onClick={() => props.addUserInput(item)}
+              onChange={() => {
+                //do nothing
+              }}
+              value={item.CODE_VALUE}
+              id={item.CODE_VALUE}
+            />
+            <div className="label-content">
+              <label htmlFor={item.CODE_VALUE}>
+                {item.CODE_DESC}
+              </label>
+              {props.logicalFieldName === 'credit_into' && item.CODE_VALUE !== 'Other Bank Account' &&
+                <div className="for-credit-into">{item.CODE_VALUE}
+                </div>}
+            </div>
+          </div>}
+
+        </div>
+      );
+    }
   };
 
-  const mockRejectedResponse = new Error('Network error');
+  return (
+    <div>
+      <div className="dropdown-select__background">
+        <div className="dropdown-select__bg-curve"></div>
+        <div
+          className={`dropdown-select__popup ${props.logicalFieldName === "maturity_amount" ? "dropdown-select--tenor" : ""
+            }`}
+        >
+          <div className="dropdown-select__header">
+            <div>{props.label}</div>
+            <div className="close" onClick={props.close}></div>
+          </div>
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    process.env.REACT_APP_RTOB_BASE_URL = 'https://mock-api.com';
-    process.env.REACT_APP_RTOB_RESUME_END_POINT = '/resume';
-    process.env.REACT_APP_RTOB_APPLICATION_END_POINT = '/application';
-  });
+          <div className="dropdown-select__expand">
+            <>
+              {props.selectedOption.map(
+                (item: LovInputValModel, index: number) => {
+                  return <>{itemList(item, index)}</>;
+                }
+              )}
+            </>
+            {props.logicalFieldName === 'credit_into' && field &&
+              field.map((currentSection: KeyWithAnyModel, index: number) => {
+                return renderComponent(
+                  currentSection,
+                  index,
+                  props.handleCallback,
+                  props.handleFieldDispatch,
+                  props.value
+                );
+              })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
-  it('should dispatch the correct actions on successful API call', async () => {
-    const appRef = 'APP123';
-    const expectedUrl = 'https://mock-api.com/application/APP123/resume';
-
-    (axios.get as jest.Mock).mockResolvedValueOnce(mockResponse);
-
-    await resumeRequest(appRef)(mockDispatch);
-
-    // Verify axios call
-    expect(axios.get).toHaveBeenCalledWith(expectedUrl);
-
-    // Verify dispatch calls
-    expect(urlParamAction.getAuthorize).toHaveBeenCalledWith({
-      channelRefNo: '12345',
-    });
-    expect(mockDispatch).toHaveBeenCalledWith(
-      urlParamAction.getAuthorize({ channelRefNo: '12345' })
-    );
-  });
-
-  it('should handle API call rejection gracefully', async () => {
-    const appRef = 'APP123';
-
-    (axios.get as jest.Mock).mockRejectedValueOnce(mockRejectedResponse);
-
-    await expect(resumeRequest(appRef)(mockDispatch)).rejects.toThrow(
-      'Network error'
-    );
-
-    // Verify no dispatch calls
-    expect(mockDispatch).not.toHaveBeenCalledWith(
-      urlParamAction.getAuthorize(expect.anything())
-    );
-  });
-
-  it('should call defaultError if response data is invalid', async () => {
-    const appRef = 'APP123';
-    const mockInvalidResponse = { data: null };
-
-    (axios.get as jest.Mock).mockResolvedValueOnce(mockInvalidResponse);
-
-    await resumeRequest(appRef)(mockDispatch);
-
-    // Verify defaultError is called
-    expect(defaultError).toHaveBeenCalled();
-
-    // Verify no dispatch calls with valid data
-    expect(mockDispatch).not.toHaveBeenCalledWith(
-      urlParamAction.getAuthorize(expect.anything())
-    );
-  });
-
-  it('should handle "Rejected" responses correctly', async () => {
-    const appRef = 'APP123';
-    const rejectedResponse = 'Rejected';
-
-    mockDispatch.mockReturnValueOnce(Promise.resolve(rejectedResponse));
-
-    await resumeRequest(appRef)(mockDispatch);
-
-    // Verify no further actions are dispatched
-    expect(mockDispatch).toHaveBeenCalled();
-    expect(mockDispatch).not.toHaveBeenCalledWith(
-      urlParamAction.getAuthorize(expect.anything())
-    );
-  });
-
-  it('should dispatch loader off if error is "Rejected"', async () => {
-    const appRef = 'APP123';
-
-    (axios.get as jest.Mock).mockRejectedValueOnce('Rejected');
-
-    await resumeRequest(appRef)(mockDispatch);
-
-    // Verify dispatchLoader is called
-    expect(mockDispatch).toHaveBeenCalledWith(false);
-  });
-});
+export default DropDownModel;
