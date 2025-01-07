@@ -1,227 +1,24 @@
-export const personRequest = (): any => {
-  const baseUrl = `${process.env.REACT_APP_RTOB_BASE_URL}`;
-  const chRefNo: any = sessionStorage.getItem("token") ? sessionStorage.getItem("token") : localStorage.getItem('chRefNo');
-  console.log(chRefNo, sessionStorage.getItem("token"), localStorage.getItem('chRefNo'));
-  const url = `${
-    baseUrl +
-    process.env.REACT_APP_RTOB_APPLICATION_END_POINT +
-    JSON.parse(chRefNo) +
-    process.env.REACT_APP_RTOB_PERSON_END_POINT
-  }`;
-    let ccplChannel: string | null,SSCode : any;
-    if(sessionStorage.getItem("ccplChannel")){
-      ccplChannel = sessionStorage.getItem('ccplChannel');
-   }
-   if(sessionStorage.getItem("SSCode")){
-    SSCode = sessionStorage.getItem('SSCode');
-  }
-  const payload = {
-    "tokenKeys": keyToken('authorize-keys'),
-    "personKeys": keyToken('myinfo-keys'),
-    "code": getTokenChno().code,
-    "channelRefNo": JSON.parse(getTokenChno().channelRefNo)
-  }
- 
-  return async (dispatch: AppDispatch) => {
-   return dispatch(exceptionCheck(await axios.post(url, payload)))
-    .then((response: any) => {
-      if (response !== "Rejected") {
-        dispatch(urlParamAction.getAuthorize({ channelRefNo: JSON.parse(chRefNo) }));
-        if(sessionStorage.getItem("token")){
-           sessionStorage.removeItem("token");
-        }
-        if(localStorage.getItem('chRefNo')){
-           localStorage.removeItem('chRefNo');
-        }
-        if(sessionStorage.getItem("ccplChannel")){
-           sessionStorage.removeItem("ccplChannel"); 
-        }
-        if(sessionStorage.getItem("SSCode")){
-          sessionStorage.removeItem("SSCode"); 
-       }
-        if (response.data && response.data.applicants) {
-          let myinfoMissingFields: any = [];
-          let mandatoryConfig = [
-            "block_a_1",
-            "street_name_a_1",
-            "postal_code_a_1",
-            "nationality_a_1",
-            "marital_status_a_1",
-            "gender_a_1",
-            "country_of_birth_a_1",
-            "passport_no_a_1"
-          ];
-          if(response.data.products[0].product_category === 'CC' || response.data.products[0].product_category === 'PL'){
-            mandatoryConfig.push("education_level_a_1");
-            if (response.data.applicants["education_level_a_1"] === undefined) {
-              myinfoMissingFields.push("education_level_a_1");
-            }
-          }
-          let resAddress = false;
-          for (let key in response.data.applicants) {
-            if (response.data.applicants[key] === null &&
-              mandatoryConfig.includes(key)) {
-              if (
-                key === "block_a_1" ||
-                key === "street_name_a_1" ||
-                key === "postal_code_a_1"
-              ) {
-                if(!resAddress) {
-                  const resblock = [
-                    "block_a_1",
-                    "street_name_a_1",
-                    "postal_code_a_1",
-                  ];
-                  myinfoMissingFields.push(...resblock);
-                }
-                resAddress = true;
-              } else {
-                myinfoMissingFields.push(key);
+ let filteredProducts: any = [];
+    let selectedProducts: Array<string>;
+    const campaign = getUrl.getParameterByName("campaign") || null;
+    const intcid = getUrl.getParameterByName("intcid") || null;
+    if(intcid){
+      localStorage.setItem("intcid",intcid);
+    }
+    if (products) {
+      selectedProducts =
+        products.indexOf(",") > 0 ? products.split(",") : [products];
+      for (let i = 0; i < selectedProducts.length; i++) {
+          // eslint-disable-next-line array-callback-return
+          const filtered = productInfoResponse.filter((product: ProductModel) => {
+            if (product.product_type === selectedProducts[i]) {
+              if (campaign) {
+                product.campaign = campaign;
               }
+              return product;
             }
+          })
+          if(filtered.length > 0) {
+            filteredProducts.push(filtered[0]);
           }
-          
-          const fieldSwaped = {...response.data};
-         
-          if (response.data.applicants) {
-            if(response.data.applicants['residency_status_a_1'] === 'FR') {
-              myinfoMissingFields.push('passport_no_a_1');
-            }
-            if(response.data.applicants['alias_a_1']) {
-              fieldSwaped.fieldMetaData.data.stages[1].fields.map((res: any) => {
-                if (res.logical_field_name === 'other_name_or_alias') {
-                  res.default_visibility = 'No';
-                } else if(res.logical_field_name === 'alias'){
-                  res.component_type = "Text";
-                  res.hide_remove_btn = true;
-                  res.default_visibility = null;
-                }
-                return res;
-              })
-            }
-          } 
- 
-          if(myinfoMissingFields.length > 0) {
-            // dispatch(stagesAction.getMissingFields(myinfoMissingFields));
-            let tmpMyInfoMissingFields : any = Object.assign([],myinfoMissingFields);
-            dispatch(stagesAction.getMissingFields(tmpMyInfoMissingFields));
- 
-            myinfoMissingFields.forEach((field: string) => {
-              const result: any = fieldSwaped.fieldMetaData.data.stages;
-              fieldSwaped.fieldMetaData.data.stages.forEach(
-                (item: any, index: number) => {
-                  if (item.stageId === "ssf-1" || item.stageId === "ssf-2") {
-                    const fieldIndex = item.fields.findIndex(
-                      (ItemIndex: KeyWithAnyModel) =>
-                        ItemIndex.logical_field_name === field.split("_a_1")[0]
-                    );
-                    if (fieldIndex >= 0) {
-                      const stageObj = result[index].fields[fieldIndex];
-                      if (
-                        stageObj.logical_field_name === "block" ||
-                        stageObj.logical_field_name === "street_name" ||
-                        stageObj.logical_field_name === "postal_code"
-                      ) {
-                        stageObj.default_visibility = null;
-                        stageObj.mandatory = "Yes";
- 
-                        fieldSwaped.fieldMetaData.data.stages[1].fields.map(
-                          (res: any) => {
-                            if (
-                              res.logical_field_name === "building_name" ||
-                              res.logical_field_name === "unit_no"
-                            ) {
-                              res.default_visibility = null;
-                              const resblock = ["building_name", "unit_no"];
-                              myinfoMissingFields.push(...resblock);
-                            }
-                            return res;
-                          }
-                        );
-                        fieldSwaped.fieldMetaData.data.stages[0].fields.map(
-                          (res: any) => {
-                            if (
-                              res.logical_field_name ===
-                                "residential_address" ||
-                              res.logical_field_name ===
-                                "residential_address_consent"
-                            ) {
-                              res.default_visibility = "No";
-                            }
-                            return res;
-                          }
-                        );
-                      }
-                    }
-                  }
-                  fieldSwaped.fieldMetaData.data.stages = result;
-                }
-              );
-            });
-          }
-          dispatch(
-            stagesAction.isPartialMyinfoResponse(
-              myinfoMissingFields.length > 0 ? "500" : "200"
-            )
-          );
-          if(ccplChannel === "IBK" || ccplChannel === "MBNK") {
-            dispatch(stagesAction.setCCPLChannel(ccplChannel))
-          }
-          if(SSCode){
-            dispatch(stagesAction.setSScode(SSCode))
-          }
-          if(response.data.application.journey_type === 'NTC' &&  (response.data.products[0].product_category === 'CC' || response.data.products[0].product_type === '280')){
-            dispatch(urlParamAction.getAuthorize({applicationRefNo:response.data.application.application_reference}));            
-            dispatch(stagesAction.setJourneyType(response.data.application.journey_type));
-            dispatch(getBancaEligibleProducts(response.data));
-            if(response.data.products[0].product_type === '280'){
-              dispatch(lovRequests(response.data, "ld-1"));
-              if(response.data.applicants.applied_rate_a_1) {dispatch(rateAction.updateAR(response.data.applicants.applied_rate_a_1))}
-              if(response.data.applicants.effective_interest_rate_a_1) { dispatch(rateAction.updateEIR(response.data.applicants.effective_interest_rate_a_1)) }
-              dispatch(
-                stagesAction.getStage({
-                  id: "ld-1",
-                  formConfig: response.data,
-                })
-              );
-              return Promise.resolve("ibankingMyinfoPL");
-             }
-            else if(response.data.products[0].product_category === 'CC'){
-               dispatch(lovRequests(response.data, "bd-3"));
-                dispatch(
-                  stagesAction.getStage({
-                    id: "bd-3",
-                    formConfig: response.data,
-                  })
-                );
-                let bancaDetails : any = {};
-                const bancaVal = response.data.applicants;
-                Object.keys(bancaVal).forEach((key:any) => {
-                  if(BANCAINFO.DEFAULT_BANCA_VALUE.includes(key)){
-                    bancaDetails[key] = bancaVal[key];
-                  }
-                });
-                dispatch(bancaListAction.getBancaData(bancaDetails));
-                return Promise.resolve("ibankingMyinfoCC");
-              }
-         } else {
-          dispatch(lovRequests(fieldSwaped, "ssf-1", myinfoMissingFields));
-          dispatch(stagesAction.addMyinfoData(fieldSwaped));
-          dispatch(
-            stagesAction.getStage({
-              id: "ssf-1",
-              formConfig: fieldLevelSwipe(fieldSwaped, myinfoMissingFields),
-            })
-          );
-          return Promise.resolve(response);
-          }
-        } else {
-          defaultError();
-        }
       }
-      })
-      .catch((err: AxiosError | string) => {
-        if(err !== "Rejected"){return Promise.reject(err);}else{dispatch(dispatchLoader(false));}
-      });
-  };
-};
