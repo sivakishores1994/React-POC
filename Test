@@ -1,13 +1,304 @@
-Here’s a professional bio for a Front-End React Developer:
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  KeyWithAnyModel,
+  LovInputValModel,
+  StoreModel,
+} from "../../../utils/model/common-model";
+import "./type-ahead.scss";
+import {
+  fieldError,
+  isFieldUpdate,
+  fieldIdAppend,
+} from "../../../utils/common/change.utils";
 
-Short Bio:
+import { ValueUpdateAction } from "../../../utils/store/value-update-slice";
+import { defaultError, getLovData } from "../../../services/common-service";
+import { AxiosError } from "axios";
+import { getFields } from "../radio-with-label/radio-with-label.utils";
+import renderComponent from "../../../modules/dashboard/fields/renderer";
 
-I am a Front-End Developer specializing in React.js, with experience in building scalable and user-friendly web applications. Passionate about creating responsive UI/UX, optimizing performance, and integrating modern JavaScript frameworks.
+const TypeAhead = (props: KeyWithAnyModel) => {
+  const [errors, setErrors] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<Array<LovInputValModel>>(
+    []
+  );
+  const lovSelector = useSelector((state: StoreModel) => state.lov);
 
-Detailed Bio:
+  const fieldErrorSelector = useSelector(
+    (state: StoreModel) => state.fielderror.error
+  );
+  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
+  const [show, hide] = useState(false);
+  const [showOption, setShowOption] = useState(true);
+  const [selectedValue, setSelectedValue] = useState<
+    Array<LovInputValModel> | any
+  >([]);
+  const [field, setField] = useState([]);
+  const [search, setSearch] = useState("");
+  const dispatch = useDispatch();
 
-I am a Front-End React Developer with a strong background in JavaScript, TypeScript, React.js, and modern UI frameworks. I have experience in developing interactive, high-performance web applications with a focus on responsive design, state management (Redux/Zustand/Context API), and API integrations.
+  useEffect(() => {
+    let searchValue: any = null;
+    /*istanbul ignore else */
+    if (lovSelector) {
+      lovSelector.lov.forEach((item: any) => {
+          /* istanbul ignore else */
+        if (item.label === props.data.logical_field_name) {
+          item.value.forEach((lovItem: any) => {
+              /* istanbul ignore else */
+            if (
+              lovItem.CODE_DESC ===
+                stageSelector[0].stageInfo.applicants[
+                  props.data.logical_field_name + "_a_1"
+                ] ||
+              lovItem.CODE_VALUE ===
+                stageSelector[0].stageInfo.applicants[
+                  props.data.logical_field_name + "_a_1"
+                ]
+            ) {
+              searchValue = lovItem;
+            }
+          });
+        }
+      });
+    }
+      /* istanbul ignore else */
+    if (searchValue) {
+      setSelectedValue([searchValue]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lovSelector]);
 
-I enjoy problem-solving, writing clean and maintainable code, and staying updated with the latest front-end technologies. My expertise includes React Hooks, Next.js, Material-UI, Tailwind CSS, and performance optimization. I thrive in collaborative environments, working closely with designers and backend developers to deliver seamless user experiences.
+  useEffect(() => {
+    if (search.length > 2) {
+      const getData = setTimeout(() => {
+        console.log(dispatch(getLovData("name_of_employer", search)));
+        dispatch(getLovData("name_of_employer", search))
+          .then((res: any) => {
+            let options = res.data;
+            options = options.filter(
+              (option: LovInputValModel) => option.CODE_VALUE !== "9999"
+            );
+            if (search.toLowerCase() === "others") {
+              const otherOption = {
+                CODE_DESC: "Others",
+                CODE_VALUE: 9999,
+                checked: false,
+              };
+              options = [...options, otherOption];
+            }
 
-Let me know if you’d like to tailor it to specific industries, skills, or experience levels! 🚀
+            if (!(options.length > 0)) {
+              setShowOption(false);
+            } else {
+              setShowOption(true);
+              setSelectedOption(options);
+            }
+          })
+          .catch((error: AxiosError) => {
+            defaultError();
+            return Promise.reject(error);
+          });
+      }, 500);
+      return () => clearTimeout(getData);
+    }
+  }, [search, dispatch]);
+
+  useEffect(() => {
+    setErrors(fieldError(fieldErrorSelector, props));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldErrorSelector]);
+
+  const dropdownHandler = (event: React.MouseEvent<any>) => {
+    event.currentTarget.firstChild.focus();
+    hide(true);
+  };
+
+  const close = () => {
+    hide(false);
+    setShowOption(false);
+  };
+
+  const addUserInput = (data: any) => {
+    if (data.CODE_VALUE === 9999) {
+      const stageComponents = dispatch(
+        getFields(stageSelector, null, "name_of_employer_other")
+      );
+      setField(stageComponents);
+      const otherVal = {
+        CODE_DESC: "Others",
+        CODE_VALUE: "9999",
+      };
+      setSelectedValue([otherVal]); 
+      props.handleCallback(props.data, "9999");  
+      dispatch(
+        isFieldUpdate(props, "9999", props.data.logical_field_name)
+      );
+    } else {
+      setField([]);
+      setSelectedValue([data]);
+      props.handleCallback(props.data, data.CODE_VALUE); 
+      dispatch(
+        isFieldUpdate(props, data.CODE_VALUE, props.data.logical_field_name)
+      );
+    }
+    hide(false);
+    setShowOption(false);
+    dispatch(
+      ValueUpdateAction.getChangeUpdate({
+        id: stageSelector[0].stageId,
+        changes: true,
+      })
+    );
+  };
+
+  useEffect(() => {
+    setErrors(false);
+    console.log(selectedValue)
+    let val =
+      selectedValue.length > 0 &&
+      selectedValue.reduce((prev: Array<string>, acc: LovInputValModel) => {
+        prev.push(acc.CODE_VALUE);
+        return prev;
+      }, []);
+    if (props.data.logical_field_name === "name_of_employer") {
+      if (val) {
+        props.handleCallback(props.data, val.toString());
+        dispatch(
+          isFieldUpdate(props, val.toString(), props.data.logical_field_name)
+        );
+      }
+    } else {
+      props.handleCallback(props.data, val.toString());
+      dispatch(
+        isFieldUpdate(props, val.toString(), props.data.logical_field_name)
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedValue]);
+  return (
+    <>
+      <div className="typeahead">
+        <label htmlFor={props.data.logical_field_name}>
+          {props.data.rwb_label_name}
+        </label>
+        <div
+          className={`typeahead__field`}
+          onClick={(event) => dropdownHandler(event)}
+        >
+          {selectedValue &&
+            selectedValue.length > 0 &&
+            selectedValue.map((item: LovInputValModel) => {
+              return (
+                <div className="typeahead__fieldlabel" key={item.CODE_VALUE}>
+                  <span>{item.CODE_DESC}</span>
+                </div>
+              );
+            })}
+          {!(selectedValue && selectedValue.length > 0) && (
+            <input
+              type="text"
+              className="typeahead__input"
+              id={fieldIdAppend(props)}
+              placeholder={props.data.rwb_label_name}
+            />
+          )}
+        </div>
+        {show && selectedOption && (
+          <div className="typeahead__background">
+            <div className="typeahead__popup">
+              <div className="typeahead__header">
+                <div>{props.data.rwb_label_name}</div>
+                <div className="close" onClick={close}></div>
+              </div>
+
+              <div className="typeahead__search">
+                <input
+                  autoFocus
+                  name="search"
+                  className="typeahead__search"
+                  type="search"
+                  placeholder="Type here to search"
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </div>
+              <div className="typeahead__expand">
+                {!showOption && (
+                  <div
+                    className="typeahead__item"
+                    data-testid="others-option"
+                    onClick={() => {
+                      const otherOption = {
+                        CODE_DESC: "Others",
+                        CODE_VALUE: "9999",
+                        checked: false,
+                      };
+                      addUserInput(otherOption);
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      checked={selectedValue[0]?.CODE_VALUE === "9999"}
+                      onChange={() => {
+                        // do nothing
+                      }}
+                      value="9999"
+                      id="others"
+                    />
+                    <label htmlFor="others">Others</label>
+                  </div>
+                )}
+                {showOption &&
+                  selectedOption.map(
+                    (item: LovInputValModel, index: number) => (
+                      <div key={index} className="typeahead__item">
+                        <input
+                          type="radio"
+                          checked={
+                            item.CODE_VALUE === selectedValue[0]?.CODE_VALUE
+                          }
+                          onClick={() => addUserInput(item)}
+                          onChange={() => { 
+                          //do nothing 
+                        }}
+                          value={item.CODE_VALUE}
+                          id={item.CODE_VALUE}
+                        />
+                        <label htmlFor={item.CODE_VALUE}>
+                          {item.CODE_DESC}
+                        </label>
+                      </div>
+                    )
+                  )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      {errors && (
+        <span
+          className="error-msg"
+          data-testid="error-message"
+          role="error-msg"
+        >
+          Please enter {props.data.rwb_label_name}
+        </span>
+      )}
+      <div>
+        {field &&
+          field.map((currentSection: KeyWithAnyModel, index: number) => {
+            return renderComponent(
+              currentSection,
+              index,
+              props.handleCallback,
+              props.handleFieldDispatch,
+              props.value
+            );
+          })}
+      </div>
+    </>
+  );
+};
+
+export default TypeAhead;
