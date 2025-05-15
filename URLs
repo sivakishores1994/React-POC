@@ -1,0 +1,188 @@
+http://localhost:3000/?products=880&campaign=5885
+ 
+NRIC :S4232178H,
+
+
+FullName: TDMKhalil TDMBreedveld,
+
+
+DOB:1989-12-11,
+
+
+Email:TDMKhalil.1000350875@sc.com,
+
+
+Mobile Number:88491949,
+ 
+NRIC :S4232179F,
+
+
+FullName:TDMImamu TDMSolomon TDMRobards ,
+
+
+DOB:1986-07-09,
+
+
+Email:TDMImamu.1000350876@sc.com,
+
+
+Mobile Number:88491950,
+ 
+NRIC :S4232180Z,
+
+
+FullName:TDMSamit TDMGefen TDMWells ,
+
+
+DOB:1992-12-09,
+
+
+Email:TDMSamit.1000350877@sc.com,
+
+
+Mobile:88491951 ,
+ 
+https://origination-test.sc.com/onboarding/sgb/ngf-apply.html?product=880&campaign=5885
+ 
+git,
+
+postman,
+
+winscp
+ 
+UAT URL
+Standard Chartered Singapore (sc.com)
+ 
+npm run ci:tests
+ 
+ 
+Trust credit test data
+ 
+S4236387A
+ 
+ 
+"cpf_valid_a_1": "Y"
+ 
+"cpf_valid_a_1": "Y",
+ 
+"adobe_ecid": "11808425318030374265115755179550025156",
+ 
+"last_updated_credit_limit_date_flag": "Y",
+
+    "fcy_td_multi_currency": "N",
+"application_type": "SF",
+ 
+React Deployed URL
+https://pt.sc.com/onboarding/sg-lending/index.html?products=880&campaign=5885
+ 
+main branch URL
+https://pt.sc.com/onboarding/sg-card/index.html?products=880&campaign=5885&auth=manual
+ 
+https://pt.sc.com/onboarding/sg-card/index.html?products=880&campaign=5887&auth=manual
+ 
+origination regression React URL
+https://origination-test.sc.com/onboarding/sgb/ngl-apply.html?product=880&campaign=5887
+ 
+Standard Chartered Singapore Bundle product
+ 
+bundle product test data
+S4212189D
+S4212190H
+S4212191F
+S4212192D
+ 
+ 
+http://localhost:3000/onboarding/sgb/ngf-apply.html?products=162,338&campaign=6203,CA001&auth=myinfo
+ 
+Deployed origination URL
+Standard Chartered Singapore
+ 
+Steps for Deployment:
+ 
+IP: 10.23.35.170 >>
+
+UserName: rtobsupport
+
+Password: Support_Dec@2024
+ 
+path for UAT(pt.sc):
+
+/apps/jboss/servers/https-8446.rdc-rtob.pt.sc.com/htdocs/onboarding/sg-card
+ 
+path for Regressionorigination-test.sc.com):
+
+/apps/jboss/servers/htdocs/https-8445.rdc-rtob.oat.sc.com/onboarding/sg-card
+ 
+ 
+Move all the build files from our local path to above path
+ 
+Give 0777 permission for all moved folders
+ 
+All products
+ 
+Channels RTOB SG - sc.com/sg URL Links
+ 
+UAT bundle product
+https://pt.sc.com/onboarding/rtob-FFF/apply.html?product=162,338&campaign=6203,CA001&auth=myinfo
+ 
+PL+CA
+https://origination-test.sc.com/onboarding/sgb/ngf-apply.html?product=280,338&campaign=9999,CA001
+ 
+https://origination-test.sc.com/onboarding/sgb/ngf-apply.html?product=280,504&campaign=9999,SA001 (PL+SA)
+ 
+UAT PL+CA
+ 
+https://pt.sc.com/onboarding/rtob-FFF/www/rtoForms/index.html?v=#%2Fonboarding%3Fcountry=SG&products=280,338&campaign=9999,CA001&aggregator=%7B%22aggregator_code%22:%22IB03%22,%22aggregator_instance%22:%22WEB%22,%22aggregator_type%22:%22Organic%22%7D&auth=myinfo
+ 
+localhost 
+http://localhost:3000/onboarding/sgb/ngf-apply.html?products=280,338&campaign=9999,CA001&auth=myinfo
+ 
+bulde product deployed URL
+Standard Chartered Singapore
+ 
+CC+CC
+https://origination-test.sc.com/onboarding/sgb/ngf-apply.html?product=162,164&campaign=6203,2502
+ 
+CC+SA
+https://pt.sc.com/onboarding/sg-lending/index.html?product=164,507&campaign=2507,SA001&auth=myinfo
+ 
+S, Sivakishore
+CC+SA  https://pt.sc.com/onboarding/sg-lending/index.html?product=164,507&campaign=2507,SA001&auth=myinfo
+
+products*
+
+ 
+Green Branch
+ 
+https://pt.sc.com/onboarding/multi-country/login/#/login
+ 
+ 
+Green Branch working one
+https://pt.sc.com/onboarding/multi-country/logingb/#/login
+ 
+CC+PL
+ 
+Standard Chartered Singapore
+ 
+CC + PL
+ 
+http://localhost:3000/onboarding/sgb/ngf-apply.html?products=164,280&campaign=2507,9999&auth=myinfo
+ 
+https://origination-test.sc.com/onboarding/sgb/ngf-apply.html?product=164,280&campaign=2507,9999
+ 
+CC+PL UAT
+ 
+https://pt.sc.com/onboarding/rtob-FFF/apply.html?product=164,280&campaign=2507,9999
+ 
+CC+PL+CA
+https://pt.sc.com/onboarding/rtob-FFF/apply.html?product=164,280,338&campaign=2507,9999,CA001
+ 
+https://origination-test.sc.com/onboarding/sgb/ngf-apply.html?product=164,280,338&campaign=2507,9999,CA001
+localhost
+Standard Chartered Singapore
+ 
+https://pt.sc.com/onboarding/catalogue/sg_green/forms/index.html?country=SG
+ 
+GreenBranch Regression
+RTO - WORKBENCH
+ 
