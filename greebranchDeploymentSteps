@@ -1,0 +1,33 @@
+constant.ts
+
+    STATE_URLS: {
+      SUPER_SHORT_FORM: "onboarding/sg-greenBranch/sg/super-short-form",
+      MYINFO_DETAILS: "onboarding/sg-greenBranch/sg/myinfo-details",
+      PERSONAL_DETAILS: "onboarding/sg-greenBranch/sg/personal-details",
+      EMPLOYMENT: "onboarding/sg-greenBranch/sg/employment",
+      DOCUMENTS: "onboarding/sg-greenBranch/sg/documents",
+      CREDIT_CARD_DETAILS: "onboarding/sg-greenBranch/sg/credit-card-details",
+      ACCOUNT_DETAILS: "onboarding/sg-greenBranch/sg/account-details",
+      TAX_DECLARATION: "onboarding/sg-greenBranch/sg/declaration",
+      REVIEW: "onboarding/sg-greenBranch/sg/review",
+      TAX_DETAILS: "onboarding/sg-greenBranch/sg/tax-details",
+      ADDITIONAL_DATA: "onboarding/sg-greenBranch/sg/additional-data",
+      OFFER: "onboarding/sg-greenBranch/sg/offer",
+      LOAN_DETAILS: "onboarding/sg-greenBranch/sg/loan-details",
+      LOAN_CALCULATOR:"onboarding/sg-greenBranch/sg/loan-calculator",
+      CREDIT_LIMIT: "onboarding/sg-greenBranch/sg/credit-limit",
+      THANKYOU: "onboarding/sg-greenBranch/sg/thankyou",
+      FINAL_DOCUMENTS: "onboarding/sg-greenBranch/sg/final-documents",
+    },
+
+package.json
+
+  "homepage": "/onboarding/sg-greenBranch",
+
+env.uat
+
+REACT_APP_HOST_URL = "https://pt.sc.com/onboarding/sg-greenBranch/index.html"
+REACT_APP_RTOB_FORMCONFIG = "/form-config?metadata=true&formtype=gb"
+REACT_APP_RTOB_FORMTYPE = "&formType=gb"
+REACT_APP_RTOB_CALLBACK_URL = "/onboarding/sg-greenBranch/myinfo-callback?code=6fcb1408-d8fb-4b2c-a9fc-9a2c4e5afe17&isMyInfoVirtual=true&isMyInfoVirtualNRIC="
+REACT_APP_SINGPASS_CALLBACK = "https://pt.sc.com/onboarding/sg-greenBranch/sg/myinfo-callback.html"
