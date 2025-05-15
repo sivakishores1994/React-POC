@@ -1,0 +1,20 @@
+Steps for Deployment:
+
+IP: 10.23.35.170 >>
+UserName: rtobsupport
+Password: Supportmarc@2025
+
+IP: 10.23.35.171 >>
+UserName: rtobsupport
+Password: Support##2025
+
+path for UAT(pt.sc):
+/apps/jboss/servers/https-8446.rdc-rtob.pt.sc.com/htdocs/onboarding/sg-card
+
+path for Regressionorigination-test.sc.com):
+/apps/jboss/servers/htdocs/https-8445.rdc-rtob.oat.sc.com/onboarding/sg-card
+
+
+Move all the build files from our local path to above path
+
+Give 0777 permission for all moved folders
