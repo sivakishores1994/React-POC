@@ -1,0 +1,600 @@
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  KeyWithAnyModel,
+  LovInputModel,
+  LovInputValModel,
+  StoreModel,
+} from "../../../utils/model/common-model";
+import "./multi-selection-box.scss";
+import {
+  fieldError,
+  isFieldUpdate,
+  isMyinfoField,
+  fieldIdAppend,
+  getUrl,
+} from "../../../utils/common/change.utils";
+import { ValueUpdateAction } from "../../../utils/store/value-update-slice";
+import { lastAction } from "../../../utils/store/last-accessed-slice";
+import { stagesAction } from "../../../utils/store/stages-slice";
+import { fieldErrorAction } from "../../../utils/store/field-error-slice";
+import errorMsg from "../../../assets/_json/error.json";
+
+const MultiSelectionBox = (props: KeyWithAnyModel) => {
+  const [errorsMessage, setErrorsMsg] = useState<any>("");
+  const [errors, setErrors] = useState(false);
+  const lovSelector = useSelector((state: StoreModel) => state.lov);
+  const [selectedOption, setSelectedOption] = useState<Array<LovInputValModel>>(
+    []
+  );
+  const fieldErrorSelector = useSelector(
+    (state: StoreModel) => state.fielderror.error
+  );
+  const myInfoResponseSelector = useSelector(
+    (state: StoreModel) => state.stages.myinfoResponse
+  );
+  const stageSelector = useSelector((state: StoreModel) => state.stages.stages);
+  const userInputSelector = useSelector((state: StoreModel) => state.stages.userInput);
+  const [show, hide] = useState(false);
+  const [update, setUpdate] = useState(false);
+  const [selectedValue, setSelectedValue] = useState<Array<LovInputValModel>>(
+    []
+  );
+  const [isMyinfo, setIsMyinfo] = useState(false);
+  const [search, setSearch] = useState("");
+  const [maxCount, setMaxCount] = useState(false);
+  const [minCount, setMinCount] = useState(true);
+  const [initialValue, setInitialValue] = useState<Array<LovInputValModel>>([]);
+  const dispatch = useDispatch();
+  const max_selects = parseInt(props.data.max_selects);
+  const [mandatoryAdditional , setMandatoryAdditional] = useState([]);
+  const [otherAddressMandatory, setotherAddressMandatory] = useState([])
+    console.log(userInputSelector.applicants.office_email_2_a_1);
+    console.log(userInputSelector.applicants.per_email_2_a_1);
+
+  useEffect(() => {
+    const data = isMyinfoField(
+      myInfoResponseSelector,
+      props.data.logical_field_name
+    );
+    setIsMyinfo(data);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myInfoResponseSelector]);
+
+  useEffect(() => {
+    const currentFieldLovRes: Array<KeyWithAnyModel> = lovSelector.lov.filter(
+      (res: LovInputModel) => {
+        return res.label === props.data.logical_field_name;
+      }
+    );
+    let preSelectedCode: string | null = null;
+    const userInputResponse = userInputSelector.applicants[fieldIdAppend(props)];
+    // const fieldValue = userInputResponse ? userInputResponse : stageSelector[0].stageInfo.applicants[fieldIdAppend(props)];
+    let fieldValue = "";
+    if (userInputResponse) {
+      fieldValue = userInputResponse;
+    } else {
+      const updatedStageStore = getUrl.getUpdatedStage();
+      const stageApplicant = updatedStageStore.updatedStageInputs.find(
+        (ref: any) => ref && ref.stageId === stageSelector[0].stageId
+      );
+      if (stageApplicant) {
+        if (
+          stageApplicant.applicants[fieldIdAppend(props)] !== undefined &&
+          stageApplicant.applicants[fieldIdAppend(props)] !== null
+        ) {
+          fieldValue = stageApplicant.applicants[fieldIdAppend(props)];
+        } else if (
+          stageSelector[0].stageInfo.applicants[fieldIdAppend(props)]
+        ) {
+          fieldValue =
+            stageSelector[0].stageInfo.applicants[fieldIdAppend(props)];
+        }
+      } else {
+        fieldValue =
+          stageSelector[0].stageInfo.applicants[fieldIdAppend(props)];
+      }
+    }
+    if (fieldValue) {
+      preSelectedCode = fieldValue;
+    }
+    if (currentFieldLovRes.length > 0) {
+      let dropDownData = JSON.parse(
+        JSON.stringify(currentFieldLovRes[0].value)
+      );
+      if(props.data.logical_field_name==='select_alt_addresses'
+      && stageSelector[0].stageInfo.applicants['permanent_address_rwb_1_a_1']){
+         dropDownData = dropDownData.filter((item:LovInputValModel)=> item.CODE_VALUE !=='PER')
+      }
+      let preSelectedVal: any = null;
+      if (preSelectedCode) {
+        preSelectedVal = preSelectedCode.includes(",")
+          ? preSelectedCode.split(",")
+          : [preSelectedCode];
+      }
+
+      const result = dropDownData.reduce(
+        (prev: Array<LovInputValModel>, acc: LovInputValModel) => {
+          if (preSelectedVal) {
+            preSelectedVal.forEach((item: any) => {
+              if (acc.CODE_VALUE === item) {
+                acc.checked = true;
+                prev.push(acc);
+              }
+            });
+          }
+          return prev;
+        },
+        []
+      );
+      setSelectedOption(dropDownData);
+      setSelectedValue(result);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stageSelector, lovSelector.lov, props.data.logical_field_name]);
+
+  useEffect(() => {
+    setErrors(fieldError(fieldErrorSelector, props));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldErrorSelector]);
+
+  const dropdownHandler = (event: React.MouseEvent<any>) => {
+    event.currentTarget.firstChild.focus();
+    hide(true);
+    const selectedValueInitVal = [...selectedValue];
+    setInitialValue(selectedValueInitVal);
+  };
+
+  const close = () => {
+    setMinCount(true);
+    hide(false);
+    setUpdate((prev: boolean) => !prev);
+    setSearch("");
+    setMaxCount(false);
+
+    setSelectedValue(initialValue);
+    setSelectedOption((prev: Array<LovInputValModel>) => {
+      let lovObj = prev.map((item: LovInputValModel) => {
+        item.checked = false;
+        return item;
+      });
+      initialValue.forEach((response: LovInputValModel) => {
+        const lovIndex = lovObj.findIndex(
+          (item: LovInputValModel) => item.CODE_VALUE === response.CODE_VALUE
+        );
+        if (lovIndex >= 0) {
+          lovObj[lovIndex].checked = true;
+        }
+      });
+      return lovObj;
+    });
+  };
+
+  const continueBtn = () => {
+    if (!(maxCount || minCount)) {
+      const prevValue =
+        stageSelector[0].stageInfo.applicants[fieldIdAppend(props)];
+      if (prevValue) {
+        const prevArrObj = prevValue.includes(",")
+          ? prevValue.split(",")
+          : [prevValue];
+        const selectedObj = selectedValue.reduce((prev: any, acc: any) => {
+          prev.push(acc.CODE_VALUE);
+          return prev.sort();
+        }, []);
+        if (prevArrObj.sort().toString() !== selectedObj.toString()) {
+          dispatch(
+            ValueUpdateAction.getChangeUpdate({
+              id: stageSelector[0].stageId,
+              changes: true,
+            })
+          );
+        }
+      } else {
+        dispatch(
+          ValueUpdateAction.getChangeUpdate({
+            id: stageSelector[0].stageId,
+            changes: true,
+          })
+        );
+      }
+
+      if (selectedValue.length > max_selects) {
+        setMaxCount(true);
+        setMinCount(false);
+      } else if (!(selectedValue.length > 0)) {
+        hide(true);
+      } else {
+        setUpdate((prev: boolean) => !prev);
+        setMaxCount(false);
+        hide(false);
+      }
+    }
+  };
+
+  const addUserInput = (data: LovInputValModel, event: any) => {
+    setErrorsMsg("");
+    const previousSelectedOption = [...selectedOption];
+    const updatedSelectedOption = previousSelectedOption.map(
+      (item: LovInputValModel) => {
+        if (item.CODE_DESC === data["CODE_DESC"]) {
+          item["checked"] = !item["checked"];
+        }
+        return item;
+      }
+    );
+    setSelectedOption(updatedSelectedOption);
+
+    setSelectedValue((prevUser: Array<LovInputValModel>) => {
+      const isExits = prevUser.find(
+        (item: LovInputValModel) => item.CODE_VALUE === data["CODE_VALUE"]
+      );
+      if (!isExits && event.target.checked) {
+        prevUser.push(data);
+      } else {
+        if (!event.target.checked) {
+          const fieldIndex = prevUser.findIndex(
+            (item: LovInputValModel) => item.CODE_VALUE === data["CODE_VALUE"]
+          );
+          prevUser.splice(fieldIndex, 1);
+        }
+      }
+      if (!(prevUser.length > max_selects)) {
+        if (!(prevUser.length > 0)) {
+          setMinCount(true);
+        } else {
+          setMaxCount(false);
+          setMinCount(false);
+        }
+      }else{
+        setErrorsMsg("");
+      }
+      return prevUser;
+    });
+  };
+
+  const removeSelectedValues = (
+    event: React.MouseEvent<HTMLDivElement, MouseEvent>,
+    data: LovInputValModel
+  ) => {
+    event.stopPropagation();
+    event.isPropagationStopped();
+    debugger
+    const previousSelectedValue = [...selectedValue];
+
+    let fieldIndex = previousSelectedValue.findIndex(
+      (item: LovInputValModel) => item.CODE_VALUE === data["CODE_VALUE"]
+    );
+    setErrorsMsg("");
+    if(fieldIndex===0){
+      if (props.data.mandatory === "Yes"){
+        setErrorsMsg(`${errorMsg.selectionbox} ${props.data.rwb_label_name}`);
+      }else{
+        setErrorsMsg("");
+      }
+    }
+    if (fieldIndex !== -1) {
+      previousSelectedValue.splice(fieldIndex, 1);
+    }
+    setSelectedValue(previousSelectedValue);
+
+    const previousSelectedOption = [...selectedOption];
+    const result = previousSelectedOption.map((item: LovInputValModel) => {
+      if (item.CODE_VALUE === data["CODE_VALUE"]) {
+        item["checked"] = !item["checked"];
+      }
+      return item;
+    });
+    setSelectedOption(result);
+    if(stageSelector[0].stageId !== 'ssf-1') {
+      dispatch(
+        ValueUpdateAction.getChangeUpdate({
+          id: stageSelector[0].stageId,
+          changes: previousSelectedValue.length > 0 ? true : false,
+        })
+      );  
+    }
+    //remove selected other address at personal details page -bd-2
+    if(props.data.logical_field_name==="select_alt_addresses"){
+      dispatch(stagesAction.removeAddToggleField({
+        removeFields:["select_alt_addresses"],
+        newFields:[],
+        value:""
+      }))
+    }
+    if(props.data.logical_field_name === "select_alt_contacts" && stageSelector[0].stageId === "bd-3" && previousSelectedValue.length === 0) {
+      dispatch(stagesAction.removeAddToggleField({
+        removeFields:["select_alt_contacts"],
+        newFields:[]
+      }))
+    }
+    // if(props.data.logical_field_name === "select_alt_contacts") {
+    //   debugger
+    //   if(data.CODE_VALUE === 'EM1'){
+    //     fieldErrorAction.removeMandatoryFields(['office_email_2'])
+    //   dispatch(stagesAction.removeAddToggleField({
+    //     removeFields:["office_email_2"],
+    //     newFields:[],
+    //     value:''
+    //   }))
+    // }else if(data.CODE_VALUE === 'CO1'){
+    //   fieldErrorAction.removeMandatoryFields(['per_email_2'])
+    //   dispatch(stagesAction.removeAddToggleField({
+    //     removeFields:["per_email_2"],
+    //     newFields:[],
+    //     value:''
+    //   }))
+    // }
+    // }
+  };
+
+  useEffect(() => {
+    setErrors(false);
+    if (selectedValue.length > 0) {
+      setMinCount(false);
+    }
+    const val =
+      selectedValue &&
+      selectedValue.reduce((prev: Array<string>, acc: LovInputValModel) => {
+        prev.push(acc.CODE_VALUE);
+        return prev;
+      }, []);
+      debugger
+    if (props.data.mandatory === "Yes") {
+      props.handleCallback(props.data, val.toString());
+    }
+    if(val.length > 0) {
+      debugger
+      dispatch(
+        isFieldUpdate(props, val.toString(), props.data.logical_field_name)
+      );  
+    } else if(props.data.logical_field_name === 'account_currency_9' && getUrl.getUpdatedStage().currentStage !== 'ssf-2') {
+      dispatch(
+        isFieldUpdate(props, val.toString(), props.data.logical_field_name)
+      );
+    } else if(props.data.logical_field_name === 'nationality_add') {
+      dispatch(
+        isFieldUpdate(props, val.toString(), props.data.logical_field_name)
+      );
+    } 
+     if(props.data.logical_field_name === 'select_alt_contacts'){
+        const fieldMapping: Record<string, string[]> = {
+              CO1: ["per_email_2"],
+              EMO: ["office_email_1"],
+              EM1: ["office_email_2"],
+              MO1: ["mobile_1", "mobile_1_add"],
+              MO2: ["mobile_2", "mobile_2_add"],
+              MF1: ["overseas_mobile1_contact_no", "overseas_mobile1"],
+              MF2: ["overseas_mobile2_contact_no", "overseas_mobile2"],
+              OF1: ["ofc1_number", "ofc1"],
+              OF2: ["ofc2_number", "ofc2"],
+              RT2: ["home_phone2_number", "home_phone2"],
+              OT1: ["office_phone1_number", "office_phone1"],
+              OT2: ["office_phone2_number", "office_phone2"],
+              RF1: ["ohph1_number", "ohph1"],
+              RF2: ["ohph2_number", "ohph2"],
+            };
+        
+       Object.entries(fieldMapping).forEach(([key,value])=>{
+          if(val.includes(key)){
+            debugger
+            dispatch(fieldErrorAction.getMandatoryFields(value));
+            dispatch(
+              stagesAction.removeAddToggleField({
+                removeFields: [],
+                newFields: value,
+                value: userInputSelector.applicants[`${value}_a_1`]? userInputSelector.applicants[`${value}_a_1`]:stageSelector[0].stageInfo.applicants[`${value}_a_1`]?stageSelector[0].stageInfo.applicants[`${value}_a_1`]: '',
+              })
+            );
+          }else{
+            dispatch(
+              stagesAction.removeAddToggleField({
+                removeFields: value,
+                newFields: [],
+                value: "",
+              })
+            );
+          }
+        })
+        // dispatch(fieldErrorAction.getMandatoryFields(val));
+      //   if(val.includes('EM1')){
+      //           dispatch(
+      //             stagesAction.removeAddToggleField({
+      //               removeFields: [],
+      //               newFields: ['office_email_2'],
+      //               value: userInputSelector.applicants.office_email_2_a_1? userInputSelector.applicants.office_email_2_a_1:stageSelector[0].stageInfo.office_email_2_a_1?stageSelector[0].stageInfo.office_email_2_a_1: '',
+      //             })
+      //           );
+      // }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedValue, update]);
+
+  const searchFilter = (item: LovInputValModel) => {
+    if (search !== "") {
+      return item.CODE_DESC.toLowerCase().includes(search.toLowerCase());
+    } else {
+      return item.CODE_DESC;
+    }
+  };
+  const focusHandler = (fieldName: string, event: React.FocusEvent<HTMLInputElement>) => {
+    dispatch(lastAction.getField(fieldName))
+  }
+
+    //BD-3 employment details page
+    // useEffect(()=>{
+    //    // Define a mapping for dynamic handling
+    //   const fieldMapping: Record<string, string[]> = {
+    //     CO1: ["per_email_2"],
+    //     EMO: ["office_email_1"],
+    //     EM1: ["office_email_2"],
+    //     MO1: ["mobile_1", "mobile_1_add"],
+    //     MO2: ["mobile_2", "mobile_2_add"],
+    //     MF1: ["overseas_mobile1_contact_no", "overseas_mobile1"],
+    //     MF2: ["overseas_mobile2_contact_no", "overseas_mobile2"],
+    //     OF1: ["ofc1_number", "ofc1"],
+    //     OF2: ["ofc2_number", "ofc2"],
+    //     RT2: ["home_phone2_number", "home_phone2"],
+    //     OT1: ["office_phone1_number", "office_phone1"],
+    //     OT2: ["office_phone2_number", "office_phone2"],
+    //     RF1: ["ohph1_number", "ohph1"],
+    //     RF2: ["ohph2_number", "ohph2"],
+    //   };
+    //   const allFields = Object.values(fieldMapping).flat();
+    //   if (userInputSelector.applicants.select_alt_contacts_a_1) {
+    //     const displayFields = userInputSelector.applicants.select_alt_contacts_a_1.split(",");
+    //     // Iterate over the fieldMapping keys to handle both inclusion and exclusion dynamically
+    //     Object.keys(fieldMapping).forEach((field) => {
+    //       const fields = fieldMapping[field];
+    //             if (displayFields.includes(field) && !mandatoryAdditional.includes(field as never)) {
+    //             // Handle inclusion: Add mandatory fields and toggle them
+    //             debugger
+    //             dispatch(fieldErrorAction.getMandatoryFields(fields));
+    //             dispatch(
+    //               stagesAction.removeAddToggleField({
+    //                 removeFields: [],
+    //                 newFields: fields,
+    //                 value: "",
+    //               })
+    //             );
+    //             setMandatoryAdditional(prevItems => [...prevItems, field] as never[])
+    //           } else {
+    //         // Handle exclusion: Remove fields if not included
+    //         dispatch(
+    //           stagesAction.removeAddToggleField({
+    //             removeFields: fields,
+    //             newFields: [],
+    //             //value: "",
+    //           })
+    //         );
+    //       }
+    //     });
+    //   } 
+    //   else {
+    //     dispatch(
+    //       stagesAction.removeAddToggleField({
+    //         removeFields: allFields,
+    //         newFields: [],
+    //         value: "",
+    //       })
+    //     );
+    //   }
+    // },[userInputSelector.applicants.select_alt_contacts_a_1])
+
+  
+  return (
+    <>
+      <div className="multi-select">
+        <label htmlFor={props.data.logical_field_name}>
+          {props.data.rwb_label_name}
+        </label>
+        <div
+          className={`multi-select__field ${
+            (isMyinfo || props.data.editable) &&
+           (stageSelector[0].stageId !== 'ssf-1' && 
+           props.data.logical_field_name!=="account_currency_rwb_4" &&
+           props.data.logical_field_name!== "account_currency_rwb_9") ? "disabled" : ""
+          }`}
+          onClick={(e) => dropdownHandler(e)}
+          onFocus={focusHandler.bind(this, props.data.logical_field_name)}
+        >
+          {selectedValue &&
+            selectedValue.length > 0 &&
+            selectedValue.map((item: LovInputValModel) => {
+              return (
+                <span
+                  className="multi-select__fieldlabel"
+                  key={item.CODE_VALUE}
+                >
+                  <span>{item.CODE_DESC}</span>
+                  <span
+                    className="multi-close"
+                    onClick={(
+                      event: React.MouseEvent<HTMLDivElement, MouseEvent>
+                    ) => removeSelectedValues(event, item)}
+                  ></span>
+                </span>
+              );
+            })}
+          {!(selectedValue && selectedValue.length > 0) && (
+            <input
+              type="text"
+              className="dropdown-select__input"
+              id={fieldIdAppend(props)}
+              placeholder={props.data.rwb_label_name}
+              onChange={() => {
+                //do nothing
+              }}
+            />
+          )}
+        </div>
+        {errors &&errorsMessage.length <= 0 && (
+        <span className="error-msg">
+          Please enter {props.data.rwb_label_name}
+        </span>
+      )}
+      <span className= {errorsMessage.length > 0? "error-msg":""}
+        >{errorsMessage}</span>
+
+        {show && selectedOption && (
+          <div className="multi-select__background">
+            <div className="dropdown-select__bg-curve"></div>
+            <div className="multi-select__popup">
+              <div className="multi-select__header">
+                <div>{props.data.rwb_label_name}</div>
+                <div className="close" data-testid="close" onClick={close}></div>
+              </div>
+              <div className="multi-select__search">
+                <input
+                  autoFocus
+                  name="search"
+                  type="search"
+                  placeholder="Search"
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </div>
+              {maxCount && (
+                <div className="max-count">
+                  *You have selected maximum options for{" "}
+                  {props.data.logical_field_name}
+                </div>
+              )}
+              <div className="multi-select__expand">
+                {selectedOption
+                  .filter(searchFilter)
+                  .map((item: LovInputValModel, index: number) => {
+                    return (
+                      <div key={index} className={`${(stageSelector[0].stageId ==="bd-3" && item.CODE_VALUE === 'MO1') ? "display-none"  : "multi-select__item" }`}>
+                        <input
+                          type="checkbox"
+                          checked={item.checked}
+                          onChange={(event) => addUserInput(item, event)}
+                          value={item.CODE_VALUE}
+                          id={item.CODE_VALUE}
+                        />
+                        <label htmlFor={item.CODE_VALUE}>
+                          {item.CODE_DESC}
+                        </label>
+                      </div>
+                    );
+                  })}
+              </div>
+              <div className="multi-select__btn">
+                <span
+                  className={`${
+                    maxCount || minCount ? "multi-select__btn--disabled" : ""
+                  }`}
+                  onClick={continueBtn}
+                >
+                  Continue
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
+
+export default MultiSelectionBox;
